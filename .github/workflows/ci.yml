@@ -13,9 +13,6 @@ defaults:
   run:
     shell: bash
 
-env:
-  CCACHE_DIR: "${{ github.workspace }}/../.ccache"
-
 jobs:
   ci:
     name: CI
