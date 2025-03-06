@@ -4,6 +4,7 @@ use std::path::Path;
 
 use cxx::{CxxString, UniquePtr};
 
+use crate::options::ImageRendererOptions;
 use crate::{MapDebugOptions, MapMode};
 
 #[cxx::bridge(namespace = "mln::bridge")]
@@ -47,6 +48,7 @@ pub mod ffi {
 
         type MapRenderer;
 
+        #[allow(clippy::too_many_arguments)]
         fn MapRenderer_new(
             mapMode: MapMode,
             width: u32,
@@ -55,6 +57,16 @@ pub mod ffi {
             cachePath: &str,
             assetRoot: &str,
             apiKey: &str,
+            baseUrl: &str,
+            uriSchemeAlias: &str,
+            apiKeyParameterName: &str,
+            sourceTemplate: &str,
+            styleTemplate: &str,
+            spritesTemplate: &str,
+            glyphsTemplate: &str,
+            tileTemplate: &str,
+            defaultStyleUrl: &str,
+            requiresApiKey: bool,
         ) -> UniquePtr<MapRenderer>;
         fn MapRenderer_render(obj: Pin<&mut MapRenderer>) -> UniquePtr<CxxString>;
         fn MapRenderer_setDebugFlags(obj: Pin<&mut MapRenderer>, flags: MapDebugOptions);
@@ -82,102 +94,22 @@ impl Image {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ImageRendererOptions {
-    width: u32,
-    height: u32,
-    pixel_ratio: f32,
-    // FIXME: can we make this an Option<PathBuf>
-    cache_path: String,
-    // FIXME: can we make this an Option<PathBuf>
-    asset_root: String,
-    // TODO: remove?
-    api_key: String,
-}
-
-impl Default for ImageRendererOptions {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ImageRendererOptions {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            width: 512,
-            height: 512,
-            pixel_ratio: 1.0,
-            cache_path: "cache.sqlite".to_string(),
-            asset_root: ".".to_string(),
-            api_key: String::new(),
-        }
-    }
-
-    pub fn with_size(&mut self, width: u32, height: u32) -> &mut Self {
-        self.width = width;
-        self.height = height;
-        self
-    }
-
-    pub fn with_pixel_ratio(&mut self, pixel_ratio: f32) -> &mut Self {
-        self.pixel_ratio = pixel_ratio;
-        self
-    }
-
-    pub fn with_cache_path(&mut self, cache_path: String) -> &mut Self {
-        self.cache_path = cache_path;
-        self
-    }
-
-    pub fn with_asset_root(&mut self, asset_root: String) -> &mut Self {
-        self.asset_root = asset_root;
-        self
-    }
-
-    pub fn with_api_key(&mut self, api_key: String) -> &mut Self {
-        self.api_key = api_key;
-        self
-    }
-
-    #[must_use]
-    pub fn build_static_renderer(self) -> ImageRenderer<Static> {
-        // TODO: Should the width/height be passed in here, or have another `build_static_with_size` method?
-        ImageRenderer::new(MapMode::Static, &self)
-    }
-
-    #[must_use]
-    pub fn build_tile_renderer(self) -> ImageRenderer<Tile> {
-        // TODO: Is the width/height used for this mode?
-        ImageRenderer::new(MapMode::Tile, &self)
-    }
-}
-
 /// Internal state type to render a static map image.
 pub struct Static;
 /// Internal state type to render a map tile.
 pub struct Tile;
 
 /// Configuration options for a tile server.
-pub struct ImageRenderer<S>(UniquePtr<ffi::MapRenderer>, PhantomData<S>);
+pub struct ImageRenderer<S>(
+    pub(crate) UniquePtr<ffi::MapRenderer>,
+    pub(crate) PhantomData<S>,
+);
 
 impl<S> ImageRenderer<S> {
-    /// Private constructor.
-    fn new(map_mode: MapMode, opts: &ImageRendererOptions) -> Self {
-        let map = ffi::MapRenderer_new(
-            map_mode,
-            opts.width,
-            opts.height,
-            opts.pixel_ratio,
-            &opts.cache_path,
-            &opts.asset_root,
-            &opts.api_key,
-        );
-        Self(map, PhantomData)
-    }
-
     /// Set the style URL for the map.
+    // FIXME: without this call, renderer just hangs
     pub fn set_style_url(&mut self, url: &str) -> &mut Self {
+        // FIXME: return a result instead of panicking
         assert!(url.contains("://"));
         ffi::MapRenderer_setStyleUrl(self.0.pin_mut(), url);
         self
@@ -185,6 +117,7 @@ impl<S> ImageRenderer<S> {
 
     pub fn set_style_path(&mut self, path: impl AsRef<Path>) -> &mut Self {
         // TODO: check if the file exists?
+        // FIXME: return a result instead of panicking
         let path = path.as_ref().to_str().expect("Path is not valid UTF-8");
         ffi::MapRenderer_setStyleUrl(self.0.pin_mut(), &format!("file://{path}"));
         self
@@ -216,7 +149,7 @@ impl ImageRenderer<Static> {
 
 impl ImageRenderer<Tile> {
     pub fn render_tile(&mut self, zoom: u8, x: u64, y: u64) -> Image {
-        let (lat, lon) = coords_to_lat_lon(zoom as f64, x, y);
+        let (lat, lon) = coords_to_lat_lon(f64::from(zoom), x, y);
         ffi::MapRenderer_setCamera(self.0.pin_mut(), lat, lon, f64::from(zoom), 0.0, 0.0);
         Image(ffi::MapRenderer_render(self.0.pin_mut()))
     }
