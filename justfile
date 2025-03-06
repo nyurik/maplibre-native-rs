@@ -66,6 +66,9 @@ test-doc:
     RUSTDOCFLAGS="-D warnings" cargo test --doc
     RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 
+test-publishing:
+    cargo publish --dry-run
+
 # Print Rust version information
 @rust-info:
     rustc --version

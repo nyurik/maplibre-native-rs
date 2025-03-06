@@ -2,8 +2,12 @@
 name = "maplibre_native"
 version = "0.1.0"
 description = "Rust bindings to the MapLibre Native map rendering engine"
+authors = ["Yuri Astrakhan <YuriAstrakhan@gmail.com>"]
+repository = "https://github.com/nyurik/maplibre-native-rs"
 edition.workspace = true
 license.workspace = true
+keywords = ["maplibre", "rendering", "gis", "tiles"]
+categories = ["external-ffi-bindings", "science::geo", "rendering"]
 rust-version = "1.81"
 
 [features]
@@ -17,12 +21,10 @@ cxx = "1.0.138"
 clap = { version = "4.5.27", features = ["derive", "env"] }
 
 [dev-dependencies]
-insta = { version = "1.42.1" }
 
 [build-dependencies]
 cmake = "0.1"
 cxx-build = "1.0.138"
-rustversion = "1.0.19"
 walkdir = "2.5.0"
 
 [lints]
@@ -37,7 +39,7 @@ missing_panics_doc = "allow" # FIXME: remove
 
 [workspace]
 members = [
-    "build_support",
+    "build_tester",
     "."
 ]
 

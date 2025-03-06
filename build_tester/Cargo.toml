@@ -1,5 +1,5 @@
 [package]
-name = "build_support"
+name = "build_helper"
 version = "0.0.0"
 publish = false
 description = "Unpublished tester for the build.rs functions"
