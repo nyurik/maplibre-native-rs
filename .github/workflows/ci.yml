@@ -13,6 +13,9 @@ defaults:
   run:
     shell: bash
 
+env:
+  CCACHE_DIR: "${{ github.workspace }}/../.ccache"
+
 jobs:
   ci:
     name: CI
@@ -21,14 +24,14 @@ jobs:
       #######################################################################################################
       ## Full test
       ##
-      - if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
-        uses: hendrikmuhs/ccache-action@v1.2
-      - if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
-        uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with: { tool: just }
       - uses: actions/checkout@v4
         with: { submodules: 'recursive' }
+      - if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
+        uses: hendrikmuhs/ccache-action@v1.2
+      - if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
+        uses: Swatinem/rust-cache@v2
       - name: Get latest CMake and Ninja
         uses: lukka/get-cmake@latest
       - name: Install dependencies

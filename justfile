@@ -73,6 +73,7 @@ test-publishing:
 @rust-info:
     rustc --version
     cargo --version
+    echo "PWD $(pwd)"
 
 # Run all tests as expected by CI
 ci-test: rust-info test-fmt clippy build test test-doc
