@@ -21,6 +21,10 @@ jobs:
       #######################################################################################################
       ## Full test
       ##
+      - uses: hendrikmuhs/ccache-action@v1.2
+        if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
+      - uses: Swatinem/rust-cache@v2
+        if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
       - uses: taiki-e/install-action@v2
         with: { tool: just }
       - uses: actions/checkout@v4
@@ -42,8 +46,6 @@ jobs:
       - name: Ensure this crate has not yet been published (on release)
         if: github.event_name == 'release'
         run: just check-if-published
-      - uses: Swatinem/rust-cache@v2
-        if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
       - run: RUST_BACKTRACE=1 just ci-test
       - name: Check semver
         uses: obi1kenobi/cargo-semver-checks-action@v2
