@@ -1,3 +1,4 @@
+use std::f64::consts::PI;
 use std::marker::PhantomData;
 use std::path::Path;
 
@@ -214,21 +215,20 @@ impl ImageRenderer<Static> {
 }
 
 impl ImageRenderer<Tile> {
-    pub fn render_tile(&mut self, zoom: f64, x: u64, y: u64) -> Image {
-        let (lat, lon) = coords_to_lat_lon(zoom, x, y);
-        ffi::MapRenderer_setCamera(self.0.pin_mut(), lat, lon, zoom, 0.0, 0.0);
+    pub fn render_tile(&mut self, zoom: u8, x: u64, y: u64) -> Image {
+        let (lat, lon) = coords_to_lat_lon(zoom as f64, x, y);
+        ffi::MapRenderer_setCamera(self.0.pin_mut(), lat, lon, f64::from(zoom), 0.0, 0.0);
         Image(ffi::MapRenderer_render(self.0.pin_mut()))
     }
 }
 
 #[allow(clippy::cast_precision_loss)]
 fn coords_to_lat_lon(zoom: f64, x: u64, y: u64) -> (f64, f64) {
-    let size = 256.0 * 2.0_f64.powf(zoom);
-    let bc = size / 360.0;
-    let cc = size / (2.0 * std::f64::consts::PI);
-    let zc = size / 2.0;
-    let g = (y as f64 - zc) / -cc;
-    let lon = (x as f64 - zc) / bc;
-    let lat = 180.0 / std::f64::consts::PI * (2.0 * g.exp().atan() - 0.5 * std::f64::consts::PI);
-    (lat, lon)
+    // https://github.com/oldmammuth/slippy_map_tilenames/blob/058678480f4b50b622cda7a48b98647292272346/src/lib.rs#L114
+    let zz = 2_f64.powf(zoom);
+    let lng = (x as f64 + 0.5) / zz * 360_f64 - 180_f64;
+    let lat = ((PI * (1_f64 - 2_f64 * (y as f64 + 0.5) / zz)).sinh())
+        .atan()
+        .to_degrees();
+    (lat, lng)
 }

@@ -36,7 +36,7 @@ inline std::unique_ptr<MapRenderer> MapRenderer_new(mbgl::MapMode mapMode,
                                                     uint32_t width,
                                                     uint32_t height,
                                                     float pixelRatio,
-                                                    const rust::Str cachePath,
+//                                                    const rust::Str cachePath,
                                                     const rust::Str assetRoot,
                                                     const rust::Str apiKey) {
     mbgl::Size size = {width, height};
@@ -44,10 +44,11 @@ inline std::unique_ptr<MapRenderer> MapRenderer_new(mbgl::MapMode mapMode,
     auto frontend = std::make_unique<mbgl::HeadlessFrontend>(size, pixelRatio);
 
     // TODO: fix this to use the correct tile server options
-    auto tileServerOptions = TileServerOptions::MapTilerConfiguration();
+    auto tileServerOptions = TileServerOptions::MapLibreConfiguration();
 
     ResourceOptions resourceOptions;
-    resourceOptions.withCachePath((std::string)cachePath)
+    resourceOptions
+//        .withCachePath((std::string)cachePath)
         .withAssetPath((std::string)assetRoot)
         .withApiKey((std::string)apiKey)
         .withTileServerOptions(tileServerOptions);
