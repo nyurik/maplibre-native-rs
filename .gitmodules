@@ -1,0 +1,4 @@
+[submodule "maplibre-native"]
+	path = maplibre-native
+	url = https://github.com/maplibre/maplibre-native.git
+	branch = rust-wrp-alpha
