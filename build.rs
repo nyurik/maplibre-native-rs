@@ -42,6 +42,7 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
             with_vulkan = true;
         }
     } else if u8::from(with_metal) + u8::from(with_opengl) + u8::from(with_vulkan) > 1 {
+        // TODO: modify for better defaults
         // This might not be the best logic, but it can change at any moment because it's a fallback with a warning
         // Current logic: if opengl is enabled, always use that, otherwise pick metal on macOS and vulkan on other platforms
         let choice = if with_opengl {
@@ -130,11 +131,11 @@ fn main() {
         }
     }
 
-    println!("cargo:rerun-if-changed=src/map_renderer.rs");
-    println!("cargo:rerun-if-changed=src/map_renderer/map_renderer.h");
-    cxx_build::bridge("src/map_renderer.rs")
+    println!("cargo:rerun-if-changed=src/renderer/bridge.rs");
+    println!("cargo:rerun-if-changed=include/map_renderer.h");
+    cxx_build::bridge("src/renderer/bridge.rs")
         .includes(&include_dirs)
-        // .file("src/wrapper.cpp")  // we may need this later
+        .file("src/renderer/bridge.cpp")
         .flag_if_supported("-std=c++20")
         .compile("maplibre_rust_map_renderer_bindings");
 

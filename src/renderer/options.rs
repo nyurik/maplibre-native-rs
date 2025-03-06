@@ -2,8 +2,8 @@ use std::marker::PhantomData;
 
 use cxx::UniquePtr;
 
-use crate::map_renderer::ffi;
-use crate::{ImageRenderer, MapMode, Static, Tile};
+use crate::renderer::bridge::ffi;
+use crate::renderer::{ImageRenderer, MapMode, Static, Tile};
 
 #[derive(Debug, Clone)]
 pub struct ImageRendererOptions {
