@@ -2,10 +2,10 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 // This allows build support to be unit-tested as well as packaged with the crate.
-#[path = "build_support/src/lib.rs"]
-mod build_support;
+#[path = "build_helper.rs"]
+mod build_helper;
 
-use build_support::parse_deps;
+use build_helper::parse_deps;
 use walkdir::WalkDir;
 
 trait CfgBool {
