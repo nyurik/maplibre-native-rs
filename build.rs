@@ -58,9 +58,8 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
             "vulkan"
         };
 
-        println!(
-            "cargo::warning=Features 'metal', 'opengl', and 'vulkan' are mutually exclusive. Auto-selected {choice}."
-        );
+        println!("cargo::warning=Features 'metal', 'opengl', and 'vulkan' are mutually exclusive.");
+        println!("cargo::warning=Using '{choice}', but the selection defaults may change later.");
     }
 
     cfg.define_bool("MLN_WITH_OPENGL", with_opengl);
@@ -133,19 +132,11 @@ fn main() {
 
     println!("cargo:rerun-if-changed=src/map_renderer.rs");
     println!("cargo:rerun-if-changed=src/map_renderer/map_renderer.h");
-    // println!("cargo:rerun-if-changed=src/tile_server_options/wrapper.cpp");
     cxx_build::bridge("src/map_renderer.rs")
         .includes(&include_dirs)
-        // .file("src/tile_server_options/wrapper.cpp")  // we may need this later
+        // .file("src/wrapper.cpp")  // we may need this later
         .flag_if_supported("-std=c++20")
         .compile("maplibre_rust_map_renderer_bindings");
-
-    println!("cargo:rerun-if-changed=src/tile_server_options.rs");
-    println!("cargo:rerun-if-changed=src/tile_server_options/tile_server_options.h");
-    cxx_build::bridge("src/tile_server_options.rs")
-        .includes(&include_dirs)
-        .flag_if_supported("-std=c++20")
-        .compile("maplibre_rust_tile_server_options_bindings");
 
     // Link mbgl-core after the bridge - or else `cargo test` won't be able to find the symbols.
     println!("cargo:rustc-link-lib=static=mbgl-core");

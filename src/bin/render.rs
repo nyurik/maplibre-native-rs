@@ -76,10 +76,6 @@ fn main() {
     // let args = Args::parse();
     // println!("Parsed arguments: {:?}", args);
 
-    // let s = TileServerOptions::default_maplibre();
-    // let val = s.source_version_prefix();
-    // println!("Parsed arguments: {:?}", val);
-
     let mut map = ImageRendererOptions::new().build_tile_renderer();
     map.set_style_url("https://demotiles.maplibre.org/style.json");
     let data = map.render_tile(1, 0, 0);

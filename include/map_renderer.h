@@ -32,26 +32,53 @@ public:
     std::unique_ptr<mbgl::Map> map;
 };
 
-inline std::unique_ptr<MapRenderer> MapRenderer_new(mbgl::MapMode mapMode,
-                                                    uint32_t width,
-                                                    uint32_t height,
-                                                    float pixelRatio,
-                                                    const rust::Str cachePath,
-                                                    const rust::Str assetRoot,
-                                                    const rust::Str apiKey) {
+inline std::unique_ptr<MapRenderer> MapRenderer_new(
+            mbgl::MapMode mapMode,
+            uint32_t width,
+            uint32_t height,
+            float pixelRatio,
+            const rust::Str cachePath,
+            const rust::Str assetRoot,
+            const rust::Str apiKey,
+            const rust::Str baseUrl,
+            const rust::Str uriSchemeAlias,
+            const rust::Str apiKeyParameterName,
+            const rust::Str sourceTemplate,
+            const rust::Str styleTemplate,
+            const rust::Str spritesTemplate,
+            const rust::Str glyphsTemplate,
+            const rust::Str tileTemplate,
+            const rust::Str defaultStyleUrl,
+            bool requiresApiKey
+
+) {
+
     mbgl::Size size = {width, height};
 
     auto frontend = std::make_unique<mbgl::HeadlessFrontend>(size, pixelRatio);
 
-    // TODO: fix this to use the correct tile server options
-    auto tileServerOptions = TileServerOptions::MapLibreConfiguration();
+    std::vector<mbgl::util::DefaultStyle> styles{
+         mbgl::util::DefaultStyle((std::string)defaultStyleUrl, "Basic", 1)};
+
+    TileServerOptions options = TileServerOptions()
+        .withBaseURL((std::string)baseUrl)
+        .withUriSchemeAlias((std::string)uriSchemeAlias)
+        .withApiKeyParameterName((std::string)apiKeyParameterName)
+        .withSourceTemplate((std::string)sourceTemplate, "", {})
+        .withStyleTemplate((std::string)styleTemplate, "maps", {})
+        .withSpritesTemplate((std::string)spritesTemplate, "", {})
+        .withGlyphsTemplate((std::string)glyphsTemplate, "fonts", {})
+        .withTileTemplate((std::string)tileTemplate, "tiles", {})
+        .withDefaultStyles(styles)
+        .withDefaultStyle("Basic")
+        .setRequiresApiKey(requiresApiKey);
 
     ResourceOptions resourceOptions;
     resourceOptions
         .withCachePath((std::string)cachePath)
         .withAssetPath((std::string)assetRoot)
         .withApiKey((std::string)apiKey)
-        .withTileServerOptions(tileServerOptions);
+        .withTileServerOptions(options);
 
     MapOptions mapOptions;
     mapOptions.withMapMode(mapMode).withSize(size).withPixelRatio(pixelRatio);
