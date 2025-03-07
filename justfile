@@ -69,6 +69,9 @@ test-doc:
 test-publishing:
     cargo publish --dry-run
 
+package:
+    cargo package
+
 # Print Rust version information
 @rust-info:
     rustc --version

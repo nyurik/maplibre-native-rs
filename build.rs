@@ -1,4 +1,6 @@
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::{env, fs};
 
 // This allows build support to be unit-tested as well as packaged with the crate.
@@ -69,6 +71,7 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
     cfg.define_bool("MLN_WITH_WERROR", false);
 
     // The default profile should be release even in a debug mode, otherwise it gets huge
+    println!("cargo:rerun-if-env-changed=MLN_BUILD_PROFILE");
     cfg.profile(
         env::var("MLN_BUILD_PROFILE")
             .as_deref()
@@ -78,13 +81,156 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
     cfg
 }
 
+/// If the dest dir is not empty, validate it.
+/// If it exists but empty, abort because we are doing local development without cloning submodules.
+fn validate_mln(dir: &Path, revision: &str) -> bool {
+    if !dir.is_dir() {
+        return false;
+    }
+    assert!(
+        dir.read_dir().expect("Can't read dir").next().is_some(),
+        r"
+MapLibre-native source directory is empty: {}
+For local development, make sure to use
+    git submodule update --init --recursive
+You may also set MLN_FROM_SOURCE to the path of the maplibre-native directory.
+",
+        dir.display()
+    );
+
+    let dest_disp = dir.display();
+    let rev = Command::new("git")
+        .current_dir(dir)
+        .arg("rev-parse")
+        .arg("HEAD")
+        .output()
+        .expect("Failed to get git revision");
+    assert!(rev.status.success(), "Failed to validate git repo");
+    let rev = String::from_utf8(rev.stdout).expect("Failed to parse git rev response");
+    assert_eq!(
+                rev.trim_ascii(),
+                revision,
+                "Unexpected git revision in {dest_disp}, please update the build.rs with the new value '{rev}'",
+            );
+    true
+}
+
+fn clone_mln(dir: &Path, repo: &str, revision: &str) {
+    let dir_disp = dir.display();
+    println!("cargo:warning=Cloning {repo} to {dir_disp} for rev {revision}");
+
+    // git(
+    //     dir,
+    //     [
+    //         "clone",
+    //         "--depth=40",
+    //         "--recurse-submodules",
+    //         "--shallow-submodules",
+    //         repo,
+    //         dir.to_str().unwrap(),
+    //     ],
+    // );
+    // git(dir, ["reset", "--hard", revision]);
+
+    // Ideally we want this method as it will only fetch the commit of interest.
+
+    // Adapted from https://stackoverflow.com/a/3489576/177275
+    // # make a new blank repository in the current directory
+    git(dir, ["init"]);
+    // # add a remote
+    git(dir, ["remote", "add", "origin", repo]);
+    // # fetch a commit (or branch or tag) of interest
+    // # Note: the full history up to this commit will be retrieved unless
+    // #       you limit it with '--depth=...' or '--shallow-since=...'
+    git(dir, ["fetch", "origin", revision, "--depth=1"]);
+    // # reset this repository's master branch to the commit of interest
+    git(dir, ["reset", "--hard", "FETCH_HEAD"]);
+    // # fetch submodules
+    git(
+        dir,
+        [
+            "submodule",
+            "update",
+            "--init",
+            "--recursive",
+            "--depth=1",
+            "--jobs=8",
+        ],
+    );
+}
+
+fn git<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(dir: &Path, args: I) {
+    fs::create_dir_all(dir).unwrap_or_else(|e| panic!("Failed to create {}: {e}", dir.display()));
+
+    let args = args
+        .into_iter()
+        .map(|v| v.as_ref().to_os_string())
+        .collect::<Vec<_>>();
+
+    let mut cmd = Command::new("git");
+
+    // let git_dir = dir.join(".git");
+    // if git_dir.exists() {
+    //     eprintln!(
+    //         "Running git {args:?} in {} with GIT_DIR={}",
+    //         dir.display(),
+    //         dir.display()
+    //     );
+    //     cmd.env("GIT_DIR", dir);
+    // } else {
+    //     eprintln!("Running git {args:?} in {} without GIT_DIR", dir.display());
+    // }
+
+    cmd.current_dir(dir)
+        .args(args.clone())
+        .status()
+        .map_err(|e| e.to_string())
+        .and_then(|v| {
+            if v.success() {
+                Ok(())
+            } else {
+                Err(v.to_string())
+            }
+        })
+        .unwrap_or_else(|e| panic!("Failed to run git {args:?}: {e}"));
+}
+
+const MLN_GIT_REPO: &str = "https://github.com/maplibre/maplibre-native.git";
+const MLN_REVISION: &str = "b3fc9a768831a5baada61ea523ab6db824241f7b";
+
 fn main() {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let cpp_root = root.join("maplibre-native");
+    println!("cargo:rerun-if-env-changed=MLN_FROM_SOURCE");
+    let cpp_root = env::var_os("MLN_FROM_SOURCE").map(PathBuf::from);
+    let cpp_root = if let Some(cpp_root) = cpp_root {
+        // User specified MLN_FROM_SOURCE - use that if it has CMakeLists.txt
+        let cpp_disp = cpp_root.display();
+        assert!(
+            cpp_root.join("CMakeLists.txt").exists(),
+            "Directory {cpp_disp} does not contain maplibre-native"
+        );
+        println!("cargo:warning=Using maplibre-native at {cpp_disp}");
+        cpp_root
+    } else {
+        // Check if this is a local development with the submodule
+        let mut cpp_root = root.join("maplibre-native");
+        if validate_mln(&cpp_root, MLN_REVISION) {
+            // Do not print any warnings - using the submodule directly
+            cpp_root
+        } else {
+            // Clone the repo into OUT_DIR - probably because this is part of dependency build
+            // Warnings shouldn't show up in the final build output unless there's an error
+            cpp_root = env::var_os("OUT_DIR").expect("OUT_DIR is not set").into();
+            cpp_root.push("maplibre-native");
+            clone_mln(&cpp_root, MLN_GIT_REPO, MLN_REVISION);
+            cpp_root
+        }
+    };
+
     let check_cmake_list = cpp_root.join("CMakeLists.txt");
     assert!(
         check_cmake_list.exists(),
-        "{} does not exist, did you forget to run `git submodule update --init --recursive`?",
+        "{} does not exist",
         check_cmake_list.display(),
     );
 
