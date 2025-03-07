@@ -64,9 +64,9 @@ jobs:
       #######################################################################################################
       ## Publish to crates.io
       ##
-      - if: github.event_name != 'release'
+      - if: github.event_name == 'push'
         run: just test-publishing
-      # - if: startsWith(github.ref, 'refs/tags/')
+      # - if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags/')
       #   name: Publish to crates.io
       #   run: cargo publish
       #   env:
