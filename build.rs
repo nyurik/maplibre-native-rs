@@ -152,18 +152,25 @@ fn clone_mln(dir: &Path, repo: &str, revision: &str) {
 }
 
 fn git<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(dir: &Path, args: I) {
+    fs::create_dir_all(dir).unwrap_or_else(|e| panic!("Failed to create {}: {e}", dir.display()));
+
     let args = args
         .into_iter()
         .map(|v| v.as_ref().to_os_string())
         .collect::<Vec<_>>();
-    eprintln!("Running git {args:?} in {}", dir.display());
-    fs::create_dir_all(dir).unwrap_or_else(|e| panic!("Failed to create {}: {e}", dir.display()));
 
     let mut cmd = Command::new("git");
 
     let git_dir = dir.join(".git");
     if git_dir.exists() {
+        eprintln!(
+            "Running git {args:?} in {} with GIT_DIR={}",
+            dir.display(),
+            dir.display()
+        );
         cmd.env("GIT_DIR", dir);
+    } else {
+        eprintln!("Running git {args:?} in {} without GIT_DIR", dir.display());
     }
 
     cmd.current_dir(dir)
