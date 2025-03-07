@@ -73,7 +73,7 @@ impl ImageRenderer<Static> {
 }
 
 impl ImageRenderer<Tile> {
-    pub fn render_tile(&mut self, zoom: u8, x: u64, y: u64) -> Image {
+    pub fn render_tile(&mut self, zoom: u8, x: u32, y: u32) -> Image {
         let (lat, lon) = coords_to_lat_lon(f64::from(zoom), x, y);
         ffi::MapRenderer_setCamera(self.0.pin_mut(), lat, lon, f64::from(zoom), 0.0, 0.0);
         Image(ffi::MapRenderer_render(self.0.pin_mut()))
@@ -81,11 +81,11 @@ impl ImageRenderer<Tile> {
 }
 
 #[allow(clippy::cast_precision_loss)]
-fn coords_to_lat_lon(zoom: f64, x: u64, y: u64) -> (f64, f64) {
+fn coords_to_lat_lon(zoom: f64, x: u32, y: u32) -> (f64, f64) {
     // https://github.com/oldmammuth/slippy_map_tilenames/blob/058678480f4b50b622cda7a48b98647292272346/src/lib.rs#L114
     let zz = 2_f64.powf(zoom);
-    let lng = (x as f64 + 0.5) / zz * 360_f64 - 180_f64;
-    let lat = ((PI * (1_f64 - 2_f64 * (y as f64 + 0.5) / zz)).sinh())
+    let lng = (f64::from(x) + 0.5) / zz * 360_f64 - 180_f64;
+    let lat = ((PI * (1_f64 - 2_f64 * (f64::from(y) + 0.5) / zz)).sinh())
         .atan()
         .to_degrees();
     (lat, lng)
