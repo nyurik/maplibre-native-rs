@@ -1,4 +1,6 @@
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::{env, fs};
 
 // This allows build support to be unit-tested as well as packaged with the crate.
@@ -78,9 +80,113 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
     cfg
 }
 
+/// If the dest dir is not empty, validate it, otherwise clone the repo into it.
+fn validate_mln(dir: &Path, revision: &str) -> bool {
+    if dir.is_dir() && dir.read_dir().expect("Can't read dir").next().is_some() {
+        let dest_disp = dir.display();
+        if !dir.exists() {
+            panic!("Directory {dest_disp} exists but is not a git repository or submodule.");
+        }
+        let rev = Command::new("git")
+            .arg("--git-dir")
+            .arg(dir)
+            .arg("rev-parse")
+            .arg("HEAD")
+            .output()
+            .expect("Failed to validate git repo");
+        assert!(rev.status.success(), "Failed to validate git repo");
+        let rev = String::from_utf8(rev.stdout).expect("Failed to parse git rev response");
+        assert_eq!(
+                rev.trim_ascii(),
+                revision,
+                "Unexpected git revision in {dest_disp}, please update the build.rs with the new value '{rev}'",
+            );
+        true
+    } else {
+        false
+    }
+}
+
+fn clone_mln(dir: &Path, repo: &str, revision: &str) {
+    let dir = dir.join(".git");
+    let dir_disp = dir.display();
+    print!("cargo:warning=Cloning {repo} to {dir_disp} for rev {revision}",);
+
+    // git(
+    //     dir,
+    //     [
+    //         "clone",
+    //         "--depth=40",
+    //         "--recurse-submodules",
+    //         "--shallow-submodules",
+    //         repo,
+    //         dir.to_str().unwrap(),
+    //     ],
+    // );
+    // git(&dir, ["reset", "--hard", revision]);
+
+    // Ideally we want this method as it will only fetch the commit of interest.
+
+    // Adapted from https://stackoverflow.com/a/3489576/177275
+    // # make a new blank repository in the current directory
+    git(&dir, ["init"]);
+    // # add a remote
+    git(&dir, ["remote", "add", "origin", repo]);
+    // # fetch a commit (or branch or tag) of interest
+    // # Note: the full history up to this commit will be retrieved unless
+    // #       you limit it with '--depth=...' or '--shallow-since=...'
+    git(&dir, ["fetch", "origin", revision, "--depth=1"]);
+    // # reset this repository's master branch to the commit of interest
+    git(&dir, ["reset", "--hard", "FETCH_HEAD"]);
+    // # fetch submodules
+    git(
+        &dir,
+        [
+            "submodule",
+            "update",
+            "--init",
+            "--recursive",
+            "--depth=1",
+            "--jobs=8",
+        ],
+    );
+}
+
+fn git<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(git_dir: &Path, args: I) {
+    let args = args
+        .into_iter()
+        .map(|v| v.as_ref().to_os_string())
+        .collect::<Vec<_>>();
+    eprintln!("Running git {args:?} in {}", git_dir.display());
+    fs::create_dir_all(git_dir)
+        .unwrap_or_else(|e| panic!("Failed to create {}: {e}", git_dir.display()));
+    Command::new("git")
+        .current_dir(git_dir)
+        .args(args.clone())
+        .status()
+        .map_err(|e| e.to_string())
+        .and_then(|v| {
+            if v.success() {
+                Ok(())
+            } else {
+                Err(v.to_string())
+            }
+        })
+        .unwrap_or_else(|e| panic!("Failed to run git {args:?}: {e}"));
+}
+
+const MLN_GIT_REPO: &str = "https://github.com/maplibre/maplibre-native.git";
+const MLN_REVISION: &str = "b3fc9a768831a5baada61ea523ab6db824241f7b";
+
 fn main() {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let cpp_root = root.join("maplibre-native");
+    let mut cpp_root = root.join("maplibre-native");
+    if !validate_mln(&cpp_root, MLN_REVISION) {
+        cpp_root = env::var_os("OUT_DIR").expect("OUT_DIR is not set").into();
+        cpp_root.push("maplibre-native");
+        clone_mln(&cpp_root, MLN_GIT_REPO, MLN_REVISION);
+    }
+
     let check_cmake_list = cpp_root.join("CMakeLists.txt");
     assert!(
         check_cmake_list.exists(),
