@@ -18,18 +18,42 @@ opengl = []
 vulkan = []  # default on other platforms
 
 [dependencies]
-cxx = "1.0.138"
-clap = { version = "4.5.27", features = ["derive", "env"] }
+cxx.workspace = true
 
 [dev-dependencies]
 
 [build-dependencies]
-cmake = "0.1"
-cxx-build = "1.0.138"
-walkdir = "2.5.0"
+cmake.workspace = true
+cxx-build.workspace = true
+walkdir.workspace = true
 
 [lints]
 workspace = true
+
+##########################################################
+##########################################################
+####  Workspace configuration for the entire project  ####
+##########################################################
+##########################################################
+
+[workspace]
+members = [
+    ".",
+    "build_tester",
+    "examples/*",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+clap = { version = "4.5.27", features = ["derive", "env"] }
+cmake = "0.1"
+cxx = "1.0.138"
+cxx-build = "1.0.138"
+maplibre_native = { path = ".", version = "0.1.0" }
+walkdir = "2.5.0"
 
 [workspace.lints.rust]
 unused_qualifications = "warn"
@@ -37,13 +61,3 @@ unused_qualifications = "warn"
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 missing_panics_doc = "allow" # FIXME: remove
-
-[workspace]
-members = [
-    "build_tester",
-    "."
-]
-
-[workspace.package]
-edition = "2021"
-license = "MIT OR Apache-2.0"
