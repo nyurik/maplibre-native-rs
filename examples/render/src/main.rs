@@ -78,6 +78,6 @@ fn main() {
 
     let mut map = ImageRendererOptions::new().build_tile_renderer();
     map.set_style_url("https://demotiles.maplibre.org/style.json");
-    let data = map.render_tile(1, 0, 0);
+    let data = map.render_tile(0, 0, 0);
     fs::write("out.png", data.as_slice()).unwrap();
 }

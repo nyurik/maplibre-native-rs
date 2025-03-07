@@ -250,6 +250,14 @@ fn main() {
         println!("{instr}");
     }
 
+    // FIXME:  These should not be manually set like this here
+    println!("cargo:rustc-link-lib=icuuc");
+    println!("cargo:rustc-link-lib=icui18n");
+    println!("cargo:rustc-link-lib=jpeg");
+    println!("cargo:rustc-link-lib=png");
+    println!("cargo:rustc-link-lib=z");
+    println!("cargo:rustc-link-lib=curl");
+
     // ------------------------------------------------------------------------
     // 2. Build the actual "mbgl-core" static library target.
     // ------------------------------------------------------------------------
