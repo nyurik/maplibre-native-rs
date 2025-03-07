@@ -82,34 +82,34 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
 
 /// If the dest dir is not empty, validate it, otherwise clone the repo into it.
 fn validate_mln(dir: &Path, revision: &str) -> bool {
-    if dir.is_dir() && dir.read_dir().expect("Can't read dir").next().is_some() {
-        let dest_disp = dir.display();
-        if !dir.exists() {
-            panic!("Directory {dest_disp} exists but is not a git repository or submodule.");
-        }
-        let rev = Command::new("git")
-            .arg("--git-dir")
-            .arg(dir)
-            .arg("rev-parse")
-            .arg("HEAD")
-            .output()
-            .expect("Failed to get git revision");
-        assert!(rev.status.success(), "Failed to validate git repo");
-        let rev = String::from_utf8(rev.stdout).expect("Failed to parse git rev response");
-        assert_eq!(
+    if !dir.is_dir() || !dir.read_dir().expect("Can't read dir").next().is_some() {
+        return false;
+    }
+
+    let dest_disp = dir.display();
+    if !dir.exists() {
+        panic!("Directory {dest_disp} exists but is not a git repository or submodule.");
+    }
+    let rev = Command::new("git")
+        .arg("--git-dir")
+        .arg(dir)
+        .arg("rev-parse")
+        .arg("HEAD")
+        .output()
+        .expect("Failed to get git revision");
+    assert!(rev.status.success(), "Failed to validate git repo");
+    let rev = String::from_utf8(rev.stdout).expect("Failed to parse git rev response");
+    assert_eq!(
                 rev.trim_ascii(),
                 revision,
                 "Unexpected git revision in {dest_disp}, please update the build.rs with the new value '{rev}'",
             );
-        true
-    } else {
-        false
-    }
+    true
 }
 
 fn clone_mln(dir: &Path, repo: &str, revision: &str) {
     let dir_disp = dir.display();
-    print!("cargo:warning=Cloning {repo} to {dir_disp} for rev {revision}",);
+    println!("cargo:warning=Cloning {repo} to {dir_disp} for rev {revision}");
 
     // git(
     //     dir,
@@ -163,7 +163,7 @@ fn git<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(dir: &Path, args: I) {
 
     let git_dir = dir.join(".git");
     if git_dir.exists() {
-        cmd.env("GIT_DIR", git_dir);
+        cmd.env("GIT_DIR", dir);
     }
 
     cmd.current_dir(dir)
@@ -185,12 +185,30 @@ const MLN_REVISION: &str = "b3fc9a768831a5baada61ea523ab6db824241f7b";
 
 fn main() {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let mut cpp_root = root.join("maplibre-native");
-    if !validate_mln(&cpp_root, MLN_REVISION) {
-        cpp_root = env::var_os("OUT_DIR").expect("OUT_DIR is not set").into();
-        cpp_root.push("maplibre-native");
-        clone_mln(&cpp_root, MLN_GIT_REPO, MLN_REVISION);
-    }
+    let cpp_root = env::var_os("MLN_FROM_SOURCE").map(PathBuf::from);
+    let cpp_root = if let Some(cpp_root) = cpp_root {
+        // User specified MLN_FROM_SOURCE - use that if it has CMakeLists.txt
+        let cpp_disp = cpp_root.display();
+        if !cpp_root.join("CMakeLists.txt").exists() {
+            panic!("Directory {cpp_disp} does not contain maplibre-native");
+        }
+        println!("cargo:warning=Using maplibre-native at {cpp_disp}");
+        cpp_root
+    } else {
+        // Check if this is a local development with the submodule
+        let mut cpp_root = root.join("maplibre-native");
+        if validate_mln(&cpp_root, MLN_REVISION) {
+            // Do not print any warnings - using the submodule directly
+            cpp_root
+        } else {
+            // Clone the repo into OUT_DIR - probably because this is part of dependency build
+            // Warnings shouldn't show up in the final build output unless there's an error
+            cpp_root = env::var_os("OUT_DIR").expect("OUT_DIR is not set").into();
+            cpp_root.push("maplibre-native");
+            clone_mln(&cpp_root, MLN_GIT_REPO, MLN_REVISION);
+            cpp_root
+        }
+    };
 
     let check_cmake_list = cpp_root.join("CMakeLists.txt");
     assert!(
