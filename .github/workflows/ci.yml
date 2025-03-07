@@ -25,8 +25,7 @@ jobs:
         with: { tool: just }
       - uses: actions/checkout@v4
         with: { submodules: 'recursive' }
-      - if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
-        uses: hendrikmuhs/ccache-action@v1.2
+      - uses: hendrikmuhs/ccache-action@v1.2
       - if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
         uses: Swatinem/rust-cache@v2
       - name: Get latest CMake and Ninja
