@@ -93,7 +93,7 @@ fn validate_mln(dir: &Path, revision: &str) -> bool {
             .arg("rev-parse")
             .arg("HEAD")
             .output()
-            .expect("Failed to validate git repo");
+            .expect("Failed to get git revision");
         assert!(rev.status.success(), "Failed to validate git repo");
         let rev = String::from_utf8(rev.stdout).expect("Failed to parse git rev response");
         assert_eq!(
@@ -108,7 +108,6 @@ fn validate_mln(dir: &Path, revision: &str) -> bool {
 }
 
 fn clone_mln(dir: &Path, repo: &str, revision: &str) {
-    let dir = dir.join(".git");
     let dir_disp = dir.display();
     print!("cargo:warning=Cloning {repo} to {dir_disp} for rev {revision}",);
 
@@ -152,16 +151,22 @@ fn clone_mln(dir: &Path, repo: &str, revision: &str) {
     );
 }
 
-fn git<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(git_dir: &Path, args: I) {
+fn git<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(dir: &Path, args: I) {
     let args = args
         .into_iter()
         .map(|v| v.as_ref().to_os_string())
         .collect::<Vec<_>>();
-    eprintln!("Running git {args:?} in {}", git_dir.display());
-    fs::create_dir_all(git_dir)
-        .unwrap_or_else(|e| panic!("Failed to create {}: {e}", git_dir.display()));
-    Command::new("git")
-        .current_dir(git_dir)
+    eprintln!("Running git {args:?} in {}", dir.display());
+    fs::create_dir_all(dir).unwrap_or_else(|e| panic!("Failed to create {}: {e}", dir.display()));
+
+    let mut cmd = Command::new("git");
+
+    let git_dir = dir.join(".git");
+    if git_dir.exists() {
+        cmd.env("GIT_DIR", git_dir);
+    }
+
+    cmd.current_dir(dir)
         .args(args.clone())
         .status()
         .map_err(|e| e.to_string())
