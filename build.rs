@@ -71,6 +71,7 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
     cfg.define_bool("MLN_WITH_WERROR", false);
 
     // The default profile should be release even in a debug mode, otherwise it gets huge
+    println!("cargo:rerun-if-env-changed=MLN_BUILD_PROFILE");
     cfg.profile(
         env::var("MLN_BUILD_PROFILE")
             .as_deref()
@@ -80,19 +81,24 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
     cfg
 }
 
-/// If the dest dir is not empty, validate it, otherwise clone the repo into it.
+/// If the dest dir is not empty, validate it.
+/// If it exists but empty, abort because we are doing local development without cloning submodules.
 fn validate_mln(dir: &Path, revision: &str) -> bool {
-    if !dir.is_dir() || !dir.read_dir().expect("Can't read dir").next().is_some() {
+    if !dir.is_dir() {
         return false;
+    }
+    if !dir.read_dir().expect("Can't read dir").next().is_some() {
+       panic!(r#"
+MapLibre-native source directory is empty: {}
+For local development, make sure to use
+    git submodule update --init --recursive
+You may also set MLN_FROM_SOURCE to the path of the maplibre-native directory.
+"#, dir.display());
     }
 
     let dest_disp = dir.display();
-    if !dir.exists() {
-        panic!("Directory {dest_disp} exists but is not a git repository or submodule.");
-    }
     let rev = Command::new("git")
-        .arg("--git-dir")
-        .arg(dir)
+        .current_dir(dir)
         .arg("rev-parse")
         .arg("HEAD")
         .output()
@@ -161,17 +167,17 @@ fn git<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(dir: &Path, args: I) {
 
     let mut cmd = Command::new("git");
 
-    let git_dir = dir.join(".git");
-    if git_dir.exists() {
-        eprintln!(
-            "Running git {args:?} in {} with GIT_DIR={}",
-            dir.display(),
-            dir.display()
-        );
-        cmd.env("GIT_DIR", dir);
-    } else {
-        eprintln!("Running git {args:?} in {} without GIT_DIR", dir.display());
-    }
+    // let git_dir = dir.join(".git");
+    // if git_dir.exists() {
+    //     eprintln!(
+    //         "Running git {args:?} in {} with GIT_DIR={}",
+    //         dir.display(),
+    //         dir.display()
+    //     );
+    //     cmd.env("GIT_DIR", dir);
+    // } else {
+    //     eprintln!("Running git {args:?} in {} without GIT_DIR", dir.display());
+    // }
 
     cmd.current_dir(dir)
         .args(args.clone())
@@ -192,6 +198,7 @@ const MLN_REVISION: &str = "b3fc9a768831a5baada61ea523ab6db824241f7b";
 
 fn main() {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    println!("cargo:rerun-if-env-changed=MLN_FROM_SOURCE");
     let cpp_root = env::var_os("MLN_FROM_SOURCE").map(PathBuf::from);
     let cpp_root = if let Some(cpp_root) = cpp_root {
         // User specified MLN_FROM_SOURCE - use that if it has CMakeLists.txt
@@ -220,7 +227,7 @@ fn main() {
     let check_cmake_list = cpp_root.join("CMakeLists.txt");
     assert!(
         check_cmake_list.exists(),
-        "{} does not exist, did you forget to run `git submodule update --init --recursive`?",
+        "{} does not exist",
         check_cmake_list.display(),
     );
 
