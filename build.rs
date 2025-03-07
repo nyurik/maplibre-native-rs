@@ -88,12 +88,15 @@ fn validate_mln(dir: &Path, revision: &str) -> bool {
         return false;
     }
     if !dir.read_dir().expect("Can't read dir").next().is_some() {
-       panic!(r#"
+        panic!(
+            r#"
 MapLibre-native source directory is empty: {}
 For local development, make sure to use
     git submodule update --init --recursive
 You may also set MLN_FROM_SOURCE to the path of the maplibre-native directory.
-"#, dir.display());
+"#,
+            dir.display()
+        );
     }
 
     let dest_disp = dir.display();
