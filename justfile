@@ -83,3 +83,27 @@ ci-test: rust-info test-fmt clippy build test test-doc
 
 # Run minimal subset of tests to ensure compatibility with MSRV (Minimum Supported Rust Version). This assumes the default toolchain is already set to MSRV.
 ci-test-msrv: rust-info build test
+
+# Verify that the current version of the crate is not the same as the one published on crates.io
+check-if-published: (assert "jq")
+    #!/usr/bin/env bash
+    LOCAL_VERSION="$(cargo metadata --format-version 1 | jq -r '.resolve.root | sub(".*@"; "")')"
+    echo "Detected crate version:  $LOCAL_VERSION"
+    CRATE_NAME="$(cargo metadata --format-version 1 | jq -r '.resolve.root | sub(".*#"; "") | sub("@.*"; "")')"
+    echo "Detected crate name:     $CRATE_NAME"
+    PUBLISHED_VERSION="$(cargo search ${CRATE_NAME} | grep "^${CRATE_NAME} =" | sed -E 's/.* = "(.*)".*/\1/')"
+    echo "Published crate version: $PUBLISHED_VERSION"
+    if [ "$LOCAL_VERSION" = "$PUBLISHED_VERSION" ]; then
+        echo "ERROR: The current crate version has already been published."
+        exit 1
+    else
+        echo "The current crate version has not yet been published."
+    fi
+
+# Ensure that a certain command is available
+[private]
+assert $COMMAND:
+    @if ! type "{{COMMAND}}" > /dev/null; then \
+        echo "Command '{{COMMAND}}' could not be found. Please make sure it has been installed on your computer." ;\
+        exit 1 ;\
+    fi
