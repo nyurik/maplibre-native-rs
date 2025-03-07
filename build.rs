@@ -87,17 +87,16 @@ fn validate_mln(dir: &Path, revision: &str) -> bool {
     if !dir.is_dir() {
         return false;
     }
-    if !dir.read_dir().expect("Can't read dir").next().is_some() {
-        panic!(
-            r#"
+    assert!(
+        dir.read_dir().expect("Can't read dir").next().is_some(),
+        r"
 MapLibre-native source directory is empty: {}
 For local development, make sure to use
     git submodule update --init --recursive
 You may also set MLN_FROM_SOURCE to the path of the maplibre-native directory.
-"#,
-            dir.display()
-        );
-    }
+",
+        dir.display()
+    );
 
     let dest_disp = dir.display();
     let rev = Command::new("git")
@@ -131,24 +130,24 @@ fn clone_mln(dir: &Path, repo: &str, revision: &str) {
     //         dir.to_str().unwrap(),
     //     ],
     // );
-    // git(&dir, ["reset", "--hard", revision]);
+    // git(dir, ["reset", "--hard", revision]);
 
     // Ideally we want this method as it will only fetch the commit of interest.
 
     // Adapted from https://stackoverflow.com/a/3489576/177275
     // # make a new blank repository in the current directory
-    git(&dir, ["init"]);
+    git(dir, ["init"]);
     // # add a remote
-    git(&dir, ["remote", "add", "origin", repo]);
+    git(dir, ["remote", "add", "origin", repo]);
     // # fetch a commit (or branch or tag) of interest
     // # Note: the full history up to this commit will be retrieved unless
     // #       you limit it with '--depth=...' or '--shallow-since=...'
-    git(&dir, ["fetch", "origin", revision, "--depth=1"]);
+    git(dir, ["fetch", "origin", revision, "--depth=1"]);
     // # reset this repository's master branch to the commit of interest
-    git(&dir, ["reset", "--hard", "FETCH_HEAD"]);
+    git(dir, ["reset", "--hard", "FETCH_HEAD"]);
     // # fetch submodules
     git(
-        &dir,
+        dir,
         [
             "submodule",
             "update",
@@ -206,9 +205,10 @@ fn main() {
     let cpp_root = if let Some(cpp_root) = cpp_root {
         // User specified MLN_FROM_SOURCE - use that if it has CMakeLists.txt
         let cpp_disp = cpp_root.display();
-        if !cpp_root.join("CMakeLists.txt").exists() {
-            panic!("Directory {cpp_disp} does not contain maplibre-native");
-        }
+        assert!(
+            cpp_root.join("CMakeLists.txt").exists(),
+            "Directory {cpp_disp} does not contain maplibre-native"
+        );
         println!("cargo:warning=Using maplibre-native at {cpp_disp}");
         cpp_root
     } else {
