@@ -50,8 +50,8 @@ build:
     RUSTFLAGS='-D warnings' cargo build --workspace --all-targets
 
 # Run the demo binary
-run:
-    cargo run
+run *ARGS:
+    cargo run --example render -- {{ARGS}}
 
 # Run all tests
 test:
