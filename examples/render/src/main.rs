@@ -111,15 +111,15 @@ impl From<DebugMode> for MapDebugOptions {
     }
 }
 
-impl Args{
-    fn render(self)->Vec<u8>{
+impl Args {
+    fn render(self) -> Vec<u8> {
         let mut map = ImageRendererOptions::new();
         map.with_api_key(self.apikey.unwrap_or_default());
         map.with_cache_path(self.cache.to_string_lossy().to_string());
         map.with_asset_root(self.asset_root.to_string_lossy().to_string());
         map.with_pixel_ratio(self.ratio);
         map.with_size(self.width, self.height);
-    
+
         match self.mode {
             Mode::Static => {
                 let mut map = map.build_static_renderer();
@@ -169,9 +169,10 @@ fn main() {
         "Rendering successfull in {elapsed:?}, writing result to {output:?}",
         elapsed = before_initalisation.elapsed()
     );
-    println!("Note: Rendering subsequent tiles/images would be faster as initialization is amortized.");
-    fs::write(&output, &data)
-        .expect(&format!("Failed to write rendered map to {output:?}"));
+    println!(
+        "Note: Rendering subsequent tiles/images would be faster as initialization is amortized."
+    );
+    fs::write(&output, &data).expect(&format!("Failed to write rendered map to {output:?}"));
 }
 
 #[cfg(test)]
@@ -188,7 +189,7 @@ mod tests {
         };
         let data = args.render();
         assert!(!data.is_empty());
-        
+
         let args = Args {
             width: 64,
             height: 64,
