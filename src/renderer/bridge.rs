@@ -9,8 +9,11 @@ pub mod ffi {
     #[repr(u32)]
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum MapMode {
+        /// Continually updating map
         Continuous,
+        /// Once-off still image of an arbitrary viewport
         Static,
+        /// Once-off still image of a single tile
         Tile,
     }
 
@@ -18,11 +21,18 @@ pub mod ffi {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum MapDebugOptions {
         NoDebug = 0,
+        /// Edges of tile boundaries are shown as thick, red lines.
+        /// Can help diagnose tile clipping issues.
         TileBorders = 0b0000_0010, // 1 << 1
         ParseStatus = 0b0000_0100, // 1 << 2
-        Timestamps = 0b0000_1000,  // 1 << 3
-        Collision = 0b0001_0000,   // 1 << 4
-        Overdraw = 0b0010_0000,    // 1 << 5
+        /// Each tile shows a timestamp indicating when it was loaded.
+        Timestamps = 0b0000_1000, // 1 << 3
+        /// Edges of glyphs and symbols are shown as faint, green lines.
+        /// Can help diagnose collision and label placement issues.
+        Collision = 0b0001_0000, // 1 << 4
+        /// Each drawing operation is replaced by a translucent fill.
+        /// Overlapping drawing operations appear more prominent to help diagnose overdrawing.
+        Overdraw = 0b0010_0000, // 1 << 5
         StencilClip = 0b0100_0000, // 1 << 6
         DepthBuffer = 0b1000_0000, // 1 << 7
     }
