@@ -30,7 +30,6 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
     cfg.define("CMAKE_C_COMPILER_LAUNCHER", "ccache");
     cfg.define("CMAKE_CXX_COMPILER_LAUNCHER", "ccache");
     cfg.define_bool("MLN_DRAWABLE_RENDERER", true);
-    cfg.define_bool("MLN_WITH_OPENGL", false);
 
     let with_opengl = env::var("CARGO_FEATURE_OPENGL").is_ok();
     let mut with_metal = env::var("CARGO_FEATURE_METAL").is_ok();
