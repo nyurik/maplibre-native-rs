@@ -62,7 +62,7 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
         };
 
         println!("cargo::warning=Features 'metal', 'opengl', and 'vulkan' are mutually exclusive.");
-        println!("cargo::warning=Using '{choice}', but the selection defaults may change later.");
+        println!("cargo::warning=Using only '{choice}', but this default selection may change in future releases.");
     }
 
     cfg.define_bool("MLN_WITH_OPENGL", with_opengl);
