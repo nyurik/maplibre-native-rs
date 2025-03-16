@@ -9,9 +9,9 @@ pub mod ffi {
     #[repr(u32)]
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum MapMode {
-        /// continually updating map
+        /// Continually updating map
         Continuous,
-        /// once-off still image of an arbitrary viewport
+        /// Once-off still image of an arbitrary viewport
         Static,
         /// once-off still image of a single tile
         Tile,
