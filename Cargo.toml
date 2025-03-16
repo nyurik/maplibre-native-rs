@@ -17,16 +17,10 @@ metal = [] # default on Apple platforms, do not add to default features
 opengl = []
 vulkan = []  # default on other platforms
 
-[[example]]
-name = "render"
-path = "examples/render/src/main.rs"
-test = true
-
 [dependencies]
 cxx.workspace = true
 
 [dev-dependencies]
-clap.workspace = true
 
 [build-dependencies]
 cmake.workspace = true

@@ -51,7 +51,7 @@ build:
 
 # Run the demo binary
 run *ARGS:
-    cargo run --example render -- {{ARGS}}
+    cargo run -p render -- {{ARGS}}
 
 # Run all tests
 test:
