@@ -1,9 +1,11 @@
-use std::{fs, path::PathBuf, time::Instant};
+use std::fs;
+use std::path::PathBuf;
+use std::time::Instant;
 
 use clap::Parser;
-use maplibre_native::{ImageRendererOptions, MapDebugOptions};
+use maplibre_native::{Image, ImageRendererOptions, MapDebugOptions};
 
-/// MapLibre Native rendering tool
+/// Command-line tool to render a map via [`mapLibre-native`](https://github.com/maplibre/maplibre-native)
 #[derive(Parser, Debug)]
 struct Args {
     /// API key
@@ -74,26 +76,38 @@ struct Args {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
 enum Mode {
     #[default]
-    /// once-off still image of an arbitrary viewport
+    /// Once-off still image of an arbitrary viewport
     Static,
-    /// once-off still image of a single tile
+    /// Once-off still image of a single tile
     Tile,
-    /// continually updating map
+    /// Continually updating map
     Continuous,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 enum DebugMode {
-    /// Edges of tile boundaries are shown as thick, red lines to help diagnose tile clipping issues.
+    /// Edges of tile boundaries are shown as thick, red lines.
+    ///
+    /// Can help diagnose tile clipping issues.
     TileBorders,
     ParseStatus,
     /// Each tile shows a timestamp indicating when it was loaded.
     Timestamps,
-    /// Edges of glyphs and symbols are shown as faint, green lines to help diagnose collision and label placement issues.
+    /// Edges of glyphs and symbols are shown as faint, green lines.
+    ///
+    /// Can help diagnose collision and label placement issues.
     Collision,
-    /// Each drawing operation is replaced by a translucent fill. Overlapping drawing operations appear more prominent to help diagnose overdrawing.
+    /// Each drawing operation is replaced by a translucent fill.
+    ///
+    /// Overlapping drawing operations appear more prominent to help diagnose overdrawing.
     Overdraw,
+    /// The stencil buffer is shown instead of the color buffer.
+    ///
+    /// Note: This option does nothing in Release builds of the SDK.
     StencilClip,
+    /// The depth buffer is shown instead of the color buffer.
+    ///
+    /// Note: This option does nothing in Release builds of the SDK
     DepthBuffer,
 }
 
@@ -112,7 +126,7 @@ impl From<DebugMode> for MapDebugOptions {
 }
 
 impl Args {
-    fn render(self) -> Vec<u8> {
+    fn render(self) -> Image {
         let mut map = ImageRendererOptions::new();
         map.with_api_key(self.apikey.unwrap_or_default());
         map.with_cache_path(self.cache.to_string_lossy().to_string());
@@ -128,19 +142,20 @@ impl Args {
                 }
                 map.set_style_url(&self.style);
                 map.set_camera(
-                    self.x as f64,
-                    self.y as f64,
-                    self.zoom as f64,
+                    f64::from(self.x),
+                    f64::from(self.y),
+                    f64::from(self.zoom),
                     self.bearing,
                     self.pitch,
                 );
-                map.render_static().as_slice().to_vec()
+                map.render_static()
             }
             Mode::Tile => {
-                if self.bearing != 0.0 || self.pitch != 0.0 {
-                    println!(
-                        "Warning: bearing and pitch are not supported in tile-mode and will be ignored"
-                    );
+                if self.bearing != 0.0 {
+                    println!("Warning: nonzero bearing is ignored in tile-mode");
+                }
+                if self.pitch != 0.0 {
+                    println!("Warning: nonzero pitch is ignored in tile-mode");
                 }
                 let mut map = map.build_tile_renderer();
                 map.set_style_url(&self.style);
@@ -148,8 +163,6 @@ impl Args {
                     map.set_debug_flags(debug.into());
                 }
                 map.render_tile(self.zoom, self.x, self.y)
-                    .as_slice()
-                    .to_vec()
             }
             Mode::Continuous => {
                 todo!("not yet implemented in the wrapper")
@@ -160,7 +173,7 @@ impl Args {
 
 fn main() {
     let args = Args::parse();
-    println!("Rendering arguments: {:#?}", args);
+    println!("Rendering arguments: {args:#?}");
     let output = args.output.clone();
 
     let before_initalisation = Instant::now();
@@ -169,10 +182,9 @@ fn main() {
         "Rendering successfull in {elapsed:?}, writing result to {output:?}",
         elapsed = before_initalisation.elapsed()
     );
-    println!(
-        "Note: Rendering subsequent tiles/images would be faster as initialization is amortized."
-    );
-    fs::write(&output, &data).expect(&format!("Failed to write rendered map to {output:?}"));
+    println!("Note: Future renders using the same instance would be faster due to amortized initialization");
+    fs::write(&output, data.as_slice())
+        .unwrap_or_else(|e| panic!("Failed to write rendered map to {output:?} because of {e:?}"));
 }
 
 #[cfg(test)]
@@ -188,7 +200,7 @@ mod tests {
             ..Args::parse()
         };
         let data = args.render();
-        assert!(!data.is_empty());
+        assert!(!data.as_slice().is_empty());
 
         let args = Args {
             width: 64,
@@ -197,6 +209,6 @@ mod tests {
             ..Args::parse()
         };
         let data = args.render();
-        assert!(!data.is_empty());
+        assert!(!data.as_slice().is_empty());
     }
 }
