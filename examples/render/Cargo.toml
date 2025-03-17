@@ -12,3 +12,7 @@ maplibre_native.workspace = true
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "render"
+path = "src/main.rs"
