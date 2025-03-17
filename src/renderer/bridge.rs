@@ -22,18 +22,27 @@ pub mod ffi {
     enum MapDebugOptions {
         NoDebug = 0,
         /// Edges of tile boundaries are shown as thick, red lines.
+        ///
         /// Can help diagnose tile clipping issues.
         TileBorders = 0b0000_0010, // 1 << 1
         ParseStatus = 0b0000_0100, // 1 << 2
         /// Each tile shows a timestamp indicating when it was loaded.
         Timestamps = 0b0000_1000, // 1 << 3
         /// Edges of glyphs and symbols are shown as faint, green lines.
+        ///
         /// Can help diagnose collision and label placement issues.
         Collision = 0b0001_0000, // 1 << 4
         /// Each drawing operation is replaced by a translucent fill.
+        ///
         /// Overlapping drawing operations appear more prominent to help diagnose overdrawing.
         Overdraw = 0b0010_0000, // 1 << 5
+        /// The stencil buffer is shown instead of the color buffer.
+        ///
+        /// Note: This option does nothing in Release builds of the SDK.
         StencilClip = 0b0100_0000, // 1 << 6
+        /// The depth buffer is shown instead of the color buffer.
+        ///
+        /// Note: This option does nothing in Release builds of the SDK
         DepthBuffer = 0b1000_0000, // 1 << 7
     }
 
