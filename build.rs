@@ -1,3 +1,5 @@
+#![allow(unused_imports, dead_code)]
+
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -233,39 +235,7 @@ fn main() {
         check_cmake_list.display(),
     );
 
-    // ------------------------------------------------------------------------
-    // 1. Build the "mbgl-core-deps" target first so that mbgl-core-deps.txt is generated.
-    // Since CMake installs targets into a "build" subdirectory, we look for the file there.
-    // ------------------------------------------------------------------------
-    let deps_build_dir = create_cmake_config(&cpp_root)
-        .build_target("mbgl-core-deps")
-        .build();
-    let deps_file = deps_build_dir.join("build").join("mbgl-core-deps.txt");
-    let deps_contents = fs::read_to_string(&deps_file)
-        .unwrap_or_else(|_| panic!("Failed to read {}", deps_file.display()));
-
-    // Parse the deps file into a list of Cargo instructions.
-    for instr in parse_deps(&deps_contents, &deps_build_dir.join("build"), true) {
-        println!("{instr}");
-    }
-
-    // FIXME:  These should not be manually set like this here
-    println!("cargo:rustc-link-lib=icuuc");
-    println!("cargo:rustc-link-lib=icui18n");
-    println!("cargo:rustc-link-lib=jpeg");
-    println!("cargo:rustc-link-lib=png");
-    println!("cargo:rustc-link-lib=z");
-    println!("cargo:rustc-link-lib=curl");
-
-    // ------------------------------------------------------------------------
-    // 2. Build the actual "mbgl-core" static library target.
-    // ------------------------------------------------------------------------
-    let core_build_dir = create_cmake_config(&cpp_root)
-        .build_target("mbgl-core")
-        .build()
-        .join("build");
-    let static_lib_base = core_build_dir.to_str().unwrap();
-    println!("cargo:rustc-link-search=native={static_lib_base}",);
+    println!("cargo:rustc-link-search=native=/home/nyurik/dev/personal/maplibre-native-rs");
 
     // ------------------------------------------------------------------------
     // 3. Gather include directories and build the C++ bridge using cxx_build.
@@ -293,7 +263,7 @@ fn main() {
         .compile("maplibre_rust_map_renderer_bindings");
 
     // Link mbgl-core after the bridge - or else `cargo test` won't be able to find the symbols.
-    println!("cargo:rustc-link-lib=static=mbgl-core");
+    println!("cargo:rustc-link-lib=static=impl");
 
     // ------------------------------------------------------------------------
     // 4. Instruct Cargo when to re-run the build script.
