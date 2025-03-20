@@ -195,7 +195,7 @@ fn git<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(dir: &Path, args: I) {
 }
 
 const MLN_GIT_REPO: &str = "https://github.com/maplibre/maplibre-native.git";
-const MLN_REVISION: &str = "b3fc9a768831a5baada61ea523ab6db824241f7b";
+const MLN_REVISION: &str = "92e9a46c1dc27957cc8462baf805742d03db6176";
 
 fn main() {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
