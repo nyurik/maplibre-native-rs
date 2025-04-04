@@ -107,10 +107,10 @@ You may also set MLN_FROM_SOURCE to the path of the maplibre-native directory.
     assert!(rev.status.success(), "Failed to validate git repo");
     let rev = String::from_utf8(rev.stdout).expect("Failed to parse git rev response");
     assert_eq!(
-                rev.trim_ascii(),
-                revision,
-                "Unexpected git revision in {dest_disp}, please update the build.rs with the new value '{rev}'",
-            );
+        rev.trim_ascii(),
+        revision,
+        "Unexpected git revision in {dest_disp}, please update the build.rs with the new value '{rev}'",
+    );
     true
 }
 
