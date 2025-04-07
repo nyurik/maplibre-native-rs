@@ -8,7 +8,7 @@ about: Report a bug
 Hello! Thanks for contributing.  For the fastest response and resolution, please:
 
  - Make the issue title a succinct but specific description of the unexpected behavior.
-   Bad: "Map rotation is broken". 
+   Bad: "Map rotation is broken".
    Good: "map.setBearing(...) throws a TypeError for negative values"
 
  - Include a link to a minimal demonstration of the bug – more below …
