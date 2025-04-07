@@ -26,6 +26,7 @@ cxx.workspace = true
 cmake.workspace = true
 cxx-build.workspace = true
 walkdir.workspace = true
+downloader.workspace = true
 
 [lints]
 workspace = true
@@ -53,6 +54,7 @@ cmake = "0.1"
 cxx = "1.0.138"
 cxx-build = "1.0.138"
 maplibre_native = { path = ".", version = "0.1.0" }
+downloader = "0.2.8"
 walkdir = "2.5.0"
 
 [workspace.lints.rust]
