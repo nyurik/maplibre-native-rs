@@ -40,6 +40,10 @@ This crate relies on the MapLibre Native library, which is compiled as part of t
 * if this repo has been cloned, it will contain the `/maplibre-native` submodule, which will be used to compile the library. Make sure to run `git submodule update --init --recursive` to fetch the submodule.
 * if there is no `/maplibre-native` submodule, the build script assumes it is being run as a dependency, and will try to download the source into the `OUT_DIR`.  Note that the first might take significant time to download and compile.
 
+## Getting Involved
+
+Join the `#maplibre-martin` slack channel at OSMUS -- automatic invite is at <https://slack.openstreetmap.us/>
+
 ## License
 
 Licensed under either of
