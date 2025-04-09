@@ -181,7 +181,9 @@ fn download_static(out_dir: &Path, revision: &str) -> (PathBuf, PathBuf) {
     fs::create_dir_all(out_dir).expect("Failed to create output directory");
     let mut downloader = Downloader::builder()
         .download_folder(out_dir)
-        .parallel_requests(u16::try_from(tasks.len()).expect("with the number of tasks, this cannot be exceeded"))
+        .parallel_requests(
+            u16::try_from(tasks.len()).expect("with the number of tasks, this cannot be exceeded"),
+        )
         .build()
         .expect("Failed to create downloader");
     let downloads = downloader
