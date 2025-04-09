@@ -20,6 +20,69 @@ impl CfgBool for cmake::Config {
     }
 }
 
+/// Supported graphics rendering APIs.
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum GraphicsRenderingAPI {
+    /// [Apple's Metal API](https://developer.apple.com/metal/) (macOS/iOS only)
+    Metal,
+    /// [OpenGL API](https://www.opengl.org/)
+    OpenGL,
+    /// [Vulkan API](https://www.vulkan.org/)
+    Vulkan,
+}
+impl GraphicsRenderingAPI {
+    /// Selects the rendering API based on enabled cargo features and platform.
+    ///
+    /// - If one feature is enabled, it is used.
+    /// - If none are enabled, defaults to Metal on macOS/iOS, Vulkan elsewhere.
+    /// - If multiple are enabled, falls back to OpenGL > Metal > Vulkan, with a warning.
+    fn from_selected_features() -> Self {
+        let with_opengl = env::var("CARGO_FEATURE_OPENGL").is_ok();
+        let with_metal = env::var("CARGO_FEATURE_METAL").is_ok();
+        let with_vulkan = env::var("CARGO_FEATURE_VULKAN").is_ok();
+
+        let is_macos = cfg!(any(target_os = "ios", target_os = "macos"));
+
+        match (with_metal, with_vulkan, with_opengl) {
+            (true, false, false) => Self::Metal,
+            (false, true, false) => Self::Vulkan,
+            (false, false, true) => Self::OpenGL,
+            (false, false, false) => {
+                if is_macos {
+                    Self::Metal
+                } else {
+                    Self::Vulkan
+                }
+            }
+            (_, _, _) => {
+                // TODO: modify for better defaults
+                // This might not be the best logic, but it can change at any moment because it's a fallback with a warning
+                // Current logic: if opengl is enabled, always use that, otherwise pick metal on macOS and vulkan on other platforms
+                println!("cargo::warning=Features 'metal', 'opengl', and 'vulkan' are mutually exclusive.");
+
+                let default_choice = if with_opengl {
+                    Self::OpenGL
+                } else if is_macos {
+                    Self::Metal
+                } else {
+                    Self::Vulkan
+                };
+                println!("cargo::warning=Using only '{default_choice}', but this default selection may change in future releases.");
+                default_choice
+            }
+        }
+    }
+}
+impl std::fmt::Display for GraphicsRenderingAPI {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Metal => f.write_str("metal"),
+            Self::OpenGL => f.write_str("opengl"),
+            Self::Vulkan => f.write_str("vulkan"),
+        }
+    }
+}
+
 /// Helper that returns a new [`cmake::Config`] with common settings.
 /// It selects the renderer based on Cargo features: the user must enable exactly one of:
 /// "metal", "opengl", or "vulkan". If none are explicitly enabled, on iOS/macOS the default is metal,
@@ -31,42 +94,19 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
     cfg.define("CMAKE_CXX_COMPILER_LAUNCHER", "ccache");
     cfg.define_bool("MLN_DRAWABLE_RENDERER", true);
 
-    let with_opengl = env::var("CARGO_FEATURE_OPENGL").is_ok();
-    let mut with_metal = env::var("CARGO_FEATURE_METAL").is_ok();
-    let mut with_vulkan = env::var("CARGO_FEATURE_VULKAN").is_ok();
-
-    let is_macos = cfg!(any(target_os = "ios", target_os = "macos"));
-    if !with_opengl && !with_metal && !with_vulkan {
-        if is_macos {
-            with_metal = true;
-        } else {
-            with_vulkan = true;
-        }
-    } else if u8::from(with_metal) + u8::from(with_opengl) + u8::from(with_vulkan) > 1 {
-        // TODO: modify for better defaults
-        // This might not be the best logic, but it can change at any moment because it's a fallback with a warning
-        // Current logic: if opengl is enabled, always use that, otherwise pick metal on macOS and vulkan on other platforms
-        let choice = if with_opengl {
-            with_metal = false;
-            with_vulkan = false;
-            "opengl"
-        } else if is_macos {
-            with_metal = true;
-            with_vulkan = false;
-            "metal"
-        } else {
-            with_vulkan = true;
-            with_metal = false;
-            "vulkan"
-        };
-
-        println!("cargo::warning=Features 'metal', 'opengl', and 'vulkan' are mutually exclusive.");
-        println!("cargo::warning=Using only '{choice}', but this default selection may change in future releases.");
-    }
-
-    cfg.define_bool("MLN_WITH_OPENGL", with_opengl);
-    cfg.define_bool("MLN_WITH_METAL", with_metal);
-    cfg.define_bool("MLN_WITH_VULKAN", with_vulkan);
+    let rendering_backend = GraphicsRenderingAPI::from_selected_features();
+    cfg.define_bool(
+        "MLN_WITH_OPENGL",
+        rendering_backend == GraphicsRenderingAPI::OpenGL,
+    );
+    cfg.define_bool(
+        "MLN_WITH_METAL",
+        rendering_backend == GraphicsRenderingAPI::Metal,
+    );
+    cfg.define_bool(
+        "MLN_WITH_VULKAN",
+        rendering_backend == GraphicsRenderingAPI::Vulkan,
+    );
     cfg.define_bool("MLN_WITH_WERROR", false);
 
     // The default profile should be release even in a debug mode, otherwise it gets huge
