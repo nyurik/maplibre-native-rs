@@ -1,0 +1,9 @@
+[submodule "variant"]
+	path = variant
+	url = git@github.com:mapbox/variant.git
+[submodule "mapbox-base"]
+	path = mapbox-base
+	url = git@github.com:mapbox/mapbox-base.git
+[submodule "geometry.hpp"]
+	path = geometry.hpp
+	url = git@github.com:mapbox/geometry.hpp.git
