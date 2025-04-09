@@ -22,14 +22,23 @@ impl CfgBool for cmake::Config {
     }
 }
 
+/// Supported graphics rendering APIs.
 #[derive(PartialEq, Eq, Clone, Copy)]
-enum RenderingBackend {
+enum GraphicsRenderingAPI {
+    /// [Apple's Metal API](https://developer.apple.com/metal/) (macOS/iOS only)
     Metal,
+    /// [OpenGL API](https://www.opengl.org/)
     OpenGL,
+    /// [Vulkan API](https://www.vulkan.org/)
     Vulkan,
 }
-impl RenderingBackend {
-    fn from_features() -> Self {
+impl GraphicsRenderingAPI {
+    /// Selects the rendering API based on enabled cargo features and platform.
+    ///
+    /// - If one feature is enabled, it is used.
+    /// - If none are enabled, defaults to Metal on macOS/iOS, Vulkan elsewhere.
+    /// - If multiple are enabled, falls back to OpenGL > Metal > Vulkan, with a warning.
+    fn from_selected_features() -> Self {
         let with_opengl = env::var("CARGO_FEATURE_OPENGL").is_ok();
         let with_metal = env::var("CARGO_FEATURE_METAL").is_ok();
         let with_vulkan = env::var("CARGO_FEATURE_VULKAN").is_ok();
@@ -53,25 +62,25 @@ impl RenderingBackend {
                 // Current logic: if opengl is enabled, always use that, otherwise pick metal on macOS and vulkan on other platforms
                 println!("cargo::warning=Features 'metal', 'opengl', and 'vulkan' are mutually exclusive.");
 
-                let choice = if with_opengl {
+                let default_choice = if with_opengl {
                     Self::OpenGL
                 } else if is_macos {
                     Self::Metal
                 } else {
                     Self::Vulkan
                 };
-                println!("cargo::warning=Using only '{choice}', but this default selection may change in future releases.");
-                choice
+                println!("cargo::warning=Using only '{default_choice}', but this default selection may change in future releases.");
+                default_choice
             }
         }
     }
 }
-impl std::fmt::Display for RenderingBackend {
+impl std::fmt::Display for GraphicsRenderingAPI {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RenderingBackend::Metal => f.write_str("metal"),
-            RenderingBackend::OpenGL => f.write_str("opengl"),
-            RenderingBackend::Vulkan => f.write_str("vulkan"),
+            Self::Metal => f.write_str("metal"),
+            Self::OpenGL => f.write_str("opengl"),
+            Self::Vulkan => f.write_str("vulkan"),
         }
     }
 }
@@ -87,18 +96,18 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
     cfg.define("CMAKE_CXX_COMPILER_LAUNCHER", "ccache");
     cfg.define_bool("MLN_DRAWABLE_RENDERER", true);
 
-    let rendering_backend = RenderingBackend::from_features();
+    let rendering_backend = GraphicsRenderingAPI::from_selected_features();
     cfg.define_bool(
         "MLN_WITH_OPENGL",
-        rendering_backend == RenderingBackend::OpenGL,
+        rendering_backend == GraphicsRenderingAPI::OpenGL,
     );
     cfg.define_bool(
         "MLN_WITH_METAL",
-        rendering_backend == RenderingBackend::Metal,
+        rendering_backend == GraphicsRenderingAPI::Metal,
     );
     cfg.define_bool(
         "MLN_WITH_VULKAN",
-        rendering_backend == RenderingBackend::Vulkan,
+        rendering_backend == GraphicsRenderingAPI::Vulkan,
     );
     cfg.define_bool("MLN_WITH_WERROR", false);
 
