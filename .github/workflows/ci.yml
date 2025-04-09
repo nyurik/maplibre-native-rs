@@ -21,10 +21,10 @@ jobs:
       #######################################################################################################
       ## Full test
       ##
-      - uses: taiki-e/install-action@v2
-        with: { tool: just }
       - uses: actions/checkout@v4
         with: { submodules: 'recursive' }
+      - uses: taiki-e/install-action@v2
+        with: { tool: 'just,cargo-llvm-cov' }
       - uses: hendrikmuhs/ccache-action@v1.2
       - if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
         uses: Swatinem/rust-cache@v2

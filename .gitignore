@@ -1,5 +1,5 @@
-target/
+.ccache
 Cargo.lock
 cache.sqlite
 out.png
-.ccache
+target/
