@@ -152,7 +152,7 @@ You may also set MLN_FROM_SOURCE to the path of the maplibre-native directory.
 }
 
 fn download_static(out_dir: &Path, revision: &str) -> (PathBuf, PathBuf) {
-    let rendering_backend = RenderingBackend::from_features();
+    let graphics_api = GraphicsRenderingAPI::from_selected_features();
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     panic!("unsupported target: only linux and macos are currently supported by maplibre-native");
@@ -166,10 +166,10 @@ fn download_static(out_dir: &Path, revision: &str) -> (PathBuf, PathBuf) {
 
     let mut tasks = Vec::new();
     let library_file = out_dir.join(format!(
-        "libmaplibre-native-core-{target}-{rendering_backend}.a"
+        "libmaplibre-native-core-{target}-{graphics_api}.a"
     ));
     if !library_file.is_file() {
-        let static_url=format!("https://github.com/maplibre/maplibre-native/releases/download/core-{revision}/libmaplibre-native-core-{target}-{rendering_backend}.a");
+        let static_url=format!("https://github.com/maplibre/maplibre-native/releases/download/core-{revision}/libmaplibre-native-core-{target}-{graphics_api}.a");
         println!("cargo:warning=Downloading precompiled maplibre-native core library from {static_url} into {}",out_dir.display());
         tasks.push(Download::new(&static_url));
     }
