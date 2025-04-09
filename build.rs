@@ -160,7 +160,7 @@ fn download_static(out_dir: &Path, revision: &str) -> (PathBuf, PathBuf) {
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
     let target = "linux-arm64";
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    let target = "linux-x86";
+    let target = "linux-x64";
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     let target = "macos-arm64";
 
@@ -338,7 +338,8 @@ fn clone_or_download(root: &Path) -> (PathBuf, Vec<PathBuf>) {
         let extracted_path = out_dir.join("headers");
         extract_headers(&headers, &extracted_path);
         // Returning the downloaded file, bypassing CMakeLists.txt check
-        return (library_file, vec![root.join("include"),extracted_path.join("include")]);
+        let include_dirs= vec![root.join("include"),root.join("geometry.hpp").join("include"), root.join("mapbox-base").join("include"), root.join("variant").join("include"),extracted_path.join("include")];
+        return (library_file, include_dirs);
     };
 
     let check_cmake_list = cpp_root.join("CMakeLists.txt");
@@ -403,25 +404,26 @@ fn build_static_lib(cpp_root: &Path) {
 }
 
 /// Gather include directories and build the C++ bridge using `cxx_build`.
-fn build_bridge(include_dirs: Vec<PathBuf>) {
+fn build_bridge(lib_name: &str, include_dirs: &[PathBuf]) {
     println!("cargo:rerun-if-changed=src/renderer/bridge.rs");
     println!("cargo:rerun-if-changed=include/map_renderer.h");
     cxx_build::bridge("src/renderer/bridge.rs")
-        .includes(&include_dirs)
+        .includes(include_dirs)
         .file("src/renderer/bridge.cpp")
         .flag_if_supported("-std=c++20")
         .compile("maplibre_rust_map_renderer_bindings");
 
     // Link mbgl-core after the bridge - or else `cargo test` won't be able to find the symbols.
-    println!("cargo:rustc-link-lib=static=mbgl-core");
+    println!("cargo:rustc-link-lib=static={lib_name}");
 }
 
 fn build_mln() {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let (cpp_root, include_dirs) = clone_or_download(&root);
-    if cpp_root.is_dir() {
+    let lib_name =  if cpp_root.is_dir() {
         add_link_targets(&cpp_root);
         build_static_lib(&cpp_root);
+        "mbgl-core".to_string()
     } else {
         println!(
             "cargo:warning=Using precompiled maplibre-native static library from {}",
@@ -429,12 +431,11 @@ fn build_mln() {
         );
         println!(
             "cargo:rustc-link-search=native={}",
-            cpp_root
-                .to_str()
-                .expect("Invalid UTF-8 in static MLN filename")
+            cpp_root.parent().unwrap().display()
         );
-    }
-    build_bridge(include_dirs);
+        cpp_root.file_name().expect("static library base has a file name").to_string_lossy().to_string().replacen("lib", "",1).replace(".a", "")
+    };
+    build_bridge(&lib_name, &include_dirs);
 }
 
 fn main() {
