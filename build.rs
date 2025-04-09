@@ -156,7 +156,7 @@ fn download_static(out_dir: &Path, revision: &str) -> (PathBuf, PathBuf) {
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     panic!("unsupported target: only linux and macos are currently supported by maplibre-native");
-    
+
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
     let target = "linux-arm64";
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -165,25 +165,23 @@ fn download_static(out_dir: &Path, revision: &str) -> (PathBuf, PathBuf) {
     let target = "macos-arm64";
 
     let mut tasks = Vec::new();
-    let library_file = out_dir.join(format!(
-        "libmaplibre-native-core-{target}-{graphics_api}.a"
-    ));
+    let library_file = out_dir.join(format!("libmaplibre-native-core-{target}-{graphics_api}.a"));
     if !library_file.is_file() {
         let static_url=format!("https://github.com/maplibre/maplibre-native/releases/download/core-{revision}/libmaplibre-native-core-{target}-{graphics_api}.a");
         println!("cargo:warning=Downloading precompiled maplibre-native core library from {static_url} into {}",out_dir.display());
         tasks.push(Download::new(&static_url));
     }
 
-    let headers_file = out_dir.join(format!("maplibre-native-headers.tar.gz"));
+    let headers_file = out_dir.join("maplibre-native-headers.tar.gz");
     if !headers_file.is_file() {
         let headers_url = format!("https://github.com/maplibre/maplibre-native/releases/download/core-{revision}/maplibre-native-headers.tar.gz");
         println!("cargo:warning=Downloading headers for maplibre-native core library from {headers_url} into {}",out_dir.display());
         tasks.push(Download::new(&headers_url));
     }
-    fs::create_dir_all(&out_dir).expect("Failed to create output directory");
+    fs::create_dir_all(out_dir).expect("Failed to create output directory");
     let mut downloader = Downloader::builder()
-        .download_folder(&out_dir)
-        .parallel_requests(tasks.len() as u16)
+        .download_folder(out_dir)
+        .parallel_requests(u16::try_from(tasks.len()).expect("with the number of tasks, this cannot be exceeded"))
         .build()
         .expect("Failed to create downloader");
     let downloads = downloader
@@ -192,7 +190,7 @@ fn download_static(out_dir: &Path, revision: &str) -> (PathBuf, PathBuf) {
         .into_iter();
     for download in downloads {
         if let Err(err) = download {
-            panic!("Unexpected error from downloader: {}", err);
+            panic!("Unexpected error from downloader: {err}");
         }
     }
 
@@ -302,7 +300,7 @@ fn git<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(dir: &Path, args: I) {
 const MLN_GIT_REPO: &str = "https://github.com/maplibre/maplibre-native.git";
 const MLN_REVISION: &str = "2544cce75374add864cfd87f13df7a263186f981";
 
-/// Clone or download maplibre-native into the OUT_DIR
+/// Clone or download maplibre-native into the `OUT_DIR`
 ///
 /// Returns the path to the maplibre-native directory and an optional path to an include directorys.
 fn clone_or_download(root: &Path) -> (PathBuf, Vec<PathBuf>) {
@@ -338,7 +336,13 @@ fn clone_or_download(root: &Path) -> (PathBuf, Vec<PathBuf>) {
         let extracted_path = out_dir.join("headers");
         extract_headers(&headers, &extracted_path);
         // Returning the downloaded file, bypassing CMakeLists.txt check
-        let include_dirs= vec![root.join("include"),root.join("geometry.hpp").join("include"), root.join("mapbox-base").join("include"), root.join("variant").join("include"),extracted_path.join("include")];
+        let include_dirs = vec![
+            root.join("include"),
+            root.join("geometry.hpp").join("include"),
+            root.join("mapbox-base").join("include"),
+            root.join("variant").join("include"),
+            extracted_path.join("include"),
+        ];
         return (library_file, include_dirs);
     };
 
@@ -365,7 +369,7 @@ fn clone_or_download(root: &Path) -> (PathBuf, Vec<PathBuf>) {
                 include_dirs.push(entry.path().to_path_buf());
             }
         }
-    };
+    }
 
     (cpp_root, include_dirs)
 }
@@ -420,7 +424,7 @@ fn build_bridge(lib_name: &str, include_dirs: &[PathBuf]) {
 fn build_mln() {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let (cpp_root, include_dirs) = clone_or_download(&root);
-    let lib_name =  if cpp_root.is_dir() {
+    let lib_name = if cpp_root.is_dir() {
         add_link_targets(&cpp_root);
         build_static_lib(&cpp_root);
         "mbgl-core".to_string()
@@ -433,7 +437,13 @@ fn build_mln() {
             "cargo:rustc-link-search=native={}",
             cpp_root.parent().unwrap().display()
         );
-        cpp_root.file_name().expect("static library base has a file name").to_string_lossy().to_string().replacen("lib", "",1).replace(".a", "")
+        cpp_root
+            .file_name()
+            .expect("static library base has a file name")
+            .to_string_lossy()
+            .to_string()
+            .replacen("lib", "", 1)
+            .replace(".a", "")
     };
     build_bridge(&lib_name, &include_dirs);
 }
