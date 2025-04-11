@@ -439,17 +439,25 @@ fn build_mln() {
             "cargo:rustc-link-search=native={}",
             cpp_root.parent().unwrap().display()
         );
+
         println!("cargo:rustc-link-lib=sqlite3"); // todo add to docs: libsqlite3-dev
-        println!("cargo:rustc-link-lib=glslang"); // todo add to docs: glslang-dev
         println!("cargo:rustc-link-lib=uv"); // todo add to docs: libuv-dev
         println!("cargo:rustc-link-lib=icuuc");
-        println!("cargo:rustc-link-lib=nu"); // todo add to docs => clone https://github.com/nextgis-borsch/lib_nunicode && cmake .  && make && sudo make install
+        println!("cargo:rustc-link-lib=nu"); // todo add to docs => git clone https://bitbucket.org/alekseyt/nunicode.git && cmake .  && make && sudo make install
         println!("cargo:rustc-link-lib=icui18n");
         println!("cargo:rustc-link-lib=jpeg");
         println!("cargo:rustc-link-lib=png");
         println!("cargo:rustc-link-lib=webp"); // todo add to docs: libwebp-dev
-        println!("cargo:rustc-link-lib=z");
         println!("cargo:rustc-link-lib=curl");
+        println!("cargo:rustc-link-lib=z");
+        // all libraries below are from glslang-dev despite their names
+        println!("cargo:rustc-link-lib=glslang"); // todo add to docs: glslang-dev
+        println!("cargo:rustc-link-lib=glslang-default-resource-limits");
+        println!("cargo:rustc-link-lib=SPIRV");
+        println!("cargo:rustc-link-lib=SPIRV-Tools-opt");
+        println!("cargo:rustc-link-lib=SPIRV-Tools");
+        println!("cargo:rustc-link-lib=MachineIndependent");
+        println!("cargo:rustc-link-lib=GenericCodeGen");
         cpp_root
             .file_name()
             .expect("static library base has a file name")

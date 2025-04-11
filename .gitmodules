@@ -7,10 +7,3 @@
 [submodule "geometry.hpp"]
 	path = geometry.hpp
 	url = git@github.com:mapbox/geometry.hpp.git
-[submodule "icu"]
-	path = icu
-	url = git@github.com:unicode-org/icu.git
-	branch = maint/maint-74
-[submodule "lib_nunicode"]
-	path = lib_nunicode
-	url = git@github.com:nextgis-borsch/lib_nunicode.git
