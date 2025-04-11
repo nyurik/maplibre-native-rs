@@ -25,6 +25,9 @@ cxx.workspace = true
 [build-dependencies]
 cmake.workspace = true
 cxx-build.workspace = true
+downloader.workspace = true
+flate2.workspace = true
+tar.workspace = true
 walkdir.workspace = true
 
 [lints]
@@ -52,7 +55,10 @@ clap = { version = "4.5.27", features = ["derive", "env", "unstable-markdown"] }
 cmake = "0.1"
 cxx = "1.0.138"
 cxx-build = "1.0.138"
+downloader = "0.2.8"
+flate2 = "1.1.1"
 maplibre_native = { path = ".", version = "0.1.0" }
+tar = "0.4.44"
 walkdir = "2.5.0"
 
 [workspace.lints.rust]

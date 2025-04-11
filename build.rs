@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs};
 
+use downloader::{Download, Downloader};
+
 // This allows build support to be unit-tested as well as packaged with the crate.
 #[path = "build_helper.rs"]
 mod build_helper;
@@ -120,12 +122,8 @@ fn create_cmake_config(cpp_root: &Path) -> cmake::Config {
     cfg
 }
 
-/// If the dest dir is not empty, validate it.
-/// If it exists but empty, abort because we are doing local development without cloning submodules.
-fn validate_mln(dir: &Path, revision: &str) -> bool {
-    if !dir.is_dir() {
-        return false;
-    }
+/// Check that a given dir contains valid maplibre-native code
+fn validate_mln(dir: &Path, revision: &str) {
     assert!(
         dir.read_dir().expect("Can't read dir").next().is_some(),
         r"
@@ -151,7 +149,74 @@ You may also set MLN_FROM_SOURCE to the path of the maplibre-native directory.
         revision,
         "Unexpected git revision in {dest_disp}, please update the build.rs with the new value '{rev}'",
     );
-    true
+}
+
+fn download_static(out_dir: &Path, revision: &str) -> (PathBuf, PathBuf) {
+    let graphics_api = GraphicsRenderingAPI::from_selected_features();
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    panic!("unsupported target: only linux and macos are currently supported by maplibre-native");
+
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    let target = "linux-arm64";
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    let target = "linux-x64";
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    let target = "macos-arm64";
+
+    let mut tasks = Vec::new();
+    let library_file = out_dir.join(format!("libmaplibre-native-core-{target}-{graphics_api}.a"));
+    if !library_file.is_file() {
+        let static_url=format!("https://github.com/maplibre/maplibre-native/releases/download/core-{revision}/libmaplibre-native-core-{target}-{graphics_api}.a");
+        println!("cargo:warning=Downloading precompiled maplibre-native core library from {static_url} into {}",out_dir.display());
+        tasks.push(Download::new(&static_url));
+    }
+
+    let headers_file = out_dir.join("maplibre-native-headers.tar.gz");
+    if !headers_file.is_file() {
+        let headers_url = format!("https://github.com/maplibre/maplibre-native/releases/download/core-{revision}/maplibre-native-headers.tar.gz");
+        println!("cargo:warning=Downloading headers for maplibre-native core library from {headers_url} into {}",out_dir.display());
+        tasks.push(Download::new(&headers_url));
+    }
+    fs::create_dir_all(out_dir).expect("Failed to create output directory");
+    let mut downloader = Downloader::builder()
+        .download_folder(out_dir)
+        .parallel_requests(
+            u16::try_from(tasks.len()).expect("with the number of tasks, this cannot be exceeded"),
+        )
+        .build()
+        .expect("Failed to create downloader");
+    let downloads = downloader
+        .download(&tasks)
+        .expect("Failed to download maplibre-native static lib")
+        .into_iter();
+    for download in downloads {
+        if let Err(err) = download {
+            panic!("Unexpected error from downloader: {err}");
+        }
+    }
+
+    (library_file, headers_file)
+}
+
+/// Extracts the headers from the downloaded tarball
+fn extract_headers(headers_from: &Path, headers_to: &Path) {
+    println!(
+        "cargo:warning=Extracting headers for maplibre-native core library from {} into {}",
+        headers_from.display(),
+        headers_to.display()
+    );
+    let headers_file = fs::File::open(headers_from).expect("Failed to open headers file");
+    let mut tar = flate2::read::GzDecoder::new(headers_file);
+
+    if !headers_to.is_dir() {
+        fs::create_dir_all(headers_to).expect("Failed to create headers directory");
+    }
+    let mut archive = tar::Archive::new(&mut tar);
+    archive.set_overwrite(true);
+    archive
+        .unpack(headers_to)
+        .expect("Failed to extract headers");
 }
 
 fn clone_mln(dir: &Path, repo: &str, revision: &str) {
@@ -235,11 +300,19 @@ fn git<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(dir: &Path, args: I) {
 }
 
 const MLN_GIT_REPO: &str = "https://github.com/maplibre/maplibre-native.git";
-const MLN_REVISION: &str = "3fc93a0b024e34514dafcbb424db93593ff540be";
+const MLN_REVISION: &str = "2544cce75374add864cfd87f13df7a263186f981";
 
-fn clone_or_download(root: &Path) -> PathBuf {
+/// Clone or download maplibre-native into the `OUT_DIR`
+///
+/// Returns the path to the maplibre-native directory and an optional path to an include directorys.
+fn clone_or_download(root: &Path) -> (PathBuf, Vec<PathBuf>) {
+    println!("cargo:rerun-if-env-changed=MLN_CLONE_REPO");
     println!("cargo:rerun-if-env-changed=MLN_FROM_SOURCE");
     let cpp_root = env::var_os("MLN_FROM_SOURCE").map(PathBuf::from);
+    let sub_module = root.join("maplibre-native");
+    let mut out_dir: PathBuf = env::var_os("OUT_DIR").expect("OUT_DIR is not set").into();
+    out_dir.push("maplibre-native");
+
     let cpp_root = if let Some(cpp_root) = cpp_root {
         // User specified MLN_FROM_SOURCE - use that if it has CMakeLists.txt
         let cpp_disp = cpp_root.display();
@@ -249,20 +322,30 @@ fn clone_or_download(root: &Path) -> PathBuf {
         );
         println!("cargo:warning=Using maplibre-native at {cpp_disp}");
         cpp_root
+    } else if env::var_os("MLN_CLONE_REPO").is_some() {
+        // Clone the repo into OUT_DIR - probably because this is part of dependency build
+        // Warnings shouldn't show up in the final build output unless there's an error
+        clone_mln(&out_dir, MLN_GIT_REPO, MLN_REVISION);
+        out_dir
+    } else if sub_module.is_dir() {
+        // this is a local development that should have the submodule checked out.
+        // Do not print any warnings - using the submodule directly
+        validate_mln(&sub_module, MLN_REVISION);
+        sub_module
     } else {
-        // Check if this is a local development with the submodule
-        let mut cpp_root = root.join("maplibre-native");
-        if validate_mln(&cpp_root, MLN_REVISION) {
-            // Do not print any warnings - using the submodule directly
-            cpp_root
-        } else {
-            // Clone the repo into OUT_DIR - probably because this is part of dependency build
-            // Warnings shouldn't show up in the final build output unless there's an error
-            cpp_root = env::var_os("OUT_DIR").expect("OUT_DIR is not set").into();
-            cpp_root.push("maplibre-native");
-            clone_mln(&cpp_root, MLN_GIT_REPO, MLN_REVISION);
-            cpp_root
-        }
+        // Defaults to downloading the static library
+        let (library_file, headers) = download_static(&out_dir, MLN_REVISION);
+        let extracted_path = out_dir.join("headers");
+        extract_headers(&headers, &extracted_path);
+        // Returning the downloaded file, bypassing CMakeLists.txt check
+        let include_dirs = vec![
+            root.join("include"),
+            root.join("geometry.hpp").join("include"),
+            root.join("mapbox-base").join("include"),
+            root.join("variant").join("include"),
+            extracted_path.join("include"),
+        ];
+        return (library_file, include_dirs);
     };
 
     let check_cmake_list = cpp_root.join("CMakeLists.txt");
@@ -272,7 +355,25 @@ fn clone_or_download(root: &Path) -> PathBuf {
         check_cmake_list.display(),
     );
 
-    cpp_root
+    // TODO: This is a temporary solution. We should get this list from CMake as well.
+    let mut include_dirs = vec![
+        root.join("include"),
+        cpp_root.join("include"),
+        cpp_root.join("platform/default/include"),
+    ];
+    if cpp_root.is_dir() {
+        for entry in WalkDir::new(cpp_root.join("vendor")) {
+            let entry = entry.expect("Failed reading maplibre-native/vendor directory");
+            if entry.file_type().is_dir()
+                && !entry.path_is_symlink()
+                && entry.file_name() == "include"
+            {
+                include_dirs.push(entry.path().to_path_buf());
+            }
+        }
+    }
+
+    (cpp_root, include_dirs)
 }
 
 /// Build the "mbgl-core-deps" target first so that mbgl-core-deps.txt is generated.
@@ -309,43 +410,63 @@ fn build_static_lib(cpp_root: &Path) {
 }
 
 /// Gather include directories and build the C++ bridge using `cxx_build`.
-fn build_bridge(root: &Path, cpp_root: &Path) {
-    // TODO: This is a temporary solution. We should get this list from CMake as well.
-    let mut include_dirs = vec![
-        root.join("include"),
-        cpp_root.join("include"),
-        cpp_root.join("platform/default/include"),
-    ];
-    for entry in WalkDir::new(cpp_root.join("vendor")) {
-        let entry = entry.expect("Failed reading maplibre-native/vendor directory");
-        if entry.file_type().is_dir() && !entry.path_is_symlink() && entry.file_name() == "include"
-        {
-            include_dirs.push(entry.path().to_path_buf());
-        }
-    }
-
+fn build_bridge(lib_name: &str, include_dirs: &[PathBuf]) {
     println!("cargo:rerun-if-changed=src/renderer/bridge.rs");
     println!("cargo:rerun-if-changed=include/map_renderer.h");
     cxx_build::bridge("src/renderer/bridge.rs")
-        .includes(&include_dirs)
+        .includes(include_dirs)
         .file("src/renderer/bridge.cpp")
         .flag_if_supported("-std=c++20")
         .compile("maplibre_rust_map_renderer_bindings");
 
     // Link mbgl-core after the bridge - or else `cargo test` won't be able to find the symbols.
-    println!("cargo:rustc-link-lib=static=mbgl-core");
+    println!("cargo:rustc-link-lib=static={lib_name}");
 }
 
 fn build_mln() {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let cpp_root = clone_or_download(&root);
-    if cpp_root.is_dir() {
+    let (cpp_root, include_dirs) = clone_or_download(&root);
+    let lib_name = if cpp_root.is_dir() {
         add_link_targets(&cpp_root);
         build_static_lib(&cpp_root);
+        "mbgl-core".to_string()
     } else {
-        todo!();
-    }
-    build_bridge(&root, &cpp_root);
+        println!(
+            "cargo:warning=Using precompiled maplibre-native static library from {}",
+            cpp_root.display()
+        );
+        println!(
+            "cargo:rustc-link-search=native={}",
+            cpp_root.parent().unwrap().display()
+        );
+
+        println!("cargo:rustc-link-lib=sqlite3"); // todo add to docs: libsqlite3-dev
+        println!("cargo:rustc-link-lib=uv"); // todo add to docs: libuv-dev
+        println!("cargo:rustc-link-lib=icuuc");
+        println!("cargo:rustc-link-lib=nu"); // todo add to docs => git clone https://bitbucket.org/alekseyt/nunicode.git && cmake .  && make && sudo make install
+        println!("cargo:rustc-link-lib=icui18n");
+        println!("cargo:rustc-link-lib=jpeg");
+        println!("cargo:rustc-link-lib=png");
+        println!("cargo:rustc-link-lib=webp"); // todo add to docs: libwebp-dev
+        println!("cargo:rustc-link-lib=curl");
+        println!("cargo:rustc-link-lib=z");
+        // all libraries below are from glslang-dev despite their names
+        println!("cargo:rustc-link-lib=glslang"); // todo add to docs: glslang-dev
+        println!("cargo:rustc-link-lib=glslang-default-resource-limits");
+        println!("cargo:rustc-link-lib=SPIRV");
+        println!("cargo:rustc-link-lib=SPIRV-Tools-opt");
+        println!("cargo:rustc-link-lib=SPIRV-Tools");
+        println!("cargo:rustc-link-lib=MachineIndependent");
+        println!("cargo:rustc-link-lib=GenericCodeGen");
+        cpp_root
+            .file_name()
+            .expect("static library base has a file name")
+            .to_string_lossy()
+            .to_string()
+            .replacen("lib", "", 1)
+            .replace(".a", "")
+    };
+    build_bridge(&lib_name, &include_dirs);
 }
 
 fn main() {
